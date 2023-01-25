@@ -13,8 +13,8 @@ How to get this running:
  3. Inside your app configuration, you'll need to set a callback URL. Etsy will redirect you to this URL after you authorize your app against your Etsy account.
  4. Open `lib\EtsyAPIGlobalVars.ps1` and edit the `$global:redirectURL` variable to be a string that is your callback URL. (Mine is included as an example, but you likely won't be able to use it for your app since the callback domain and your app's domain must match.)
  5. *Optional* For simplicity, I've included my `auth.php` inside the `web` folder in the repo. This is where my callback URL is pointed to. You can use this file to easily get the Etsy authorization code and copy it to your clipboard after authorizing the Etsy app.
- 6. Run 1THEM.ps11
- 7. When prompted, give Etsy your API key. It will test communication with the Etsy API, if unsuccessful it will print the error.
+ 6. Run `THEM.ps1`
+ 7. When prompted, provide your Etsy API key. The script will test communication with the Etsy API, if unsuccessful it will print the error.
  8. Once connected, you'll be given a prompt for what you'd like to do. Select `Add New Shop` and follow the prompts.
  9. You're all set! When you reload `THEM.ps1` it will test a connection to Etsy, and reload any previously saved shops if they exist.
 
