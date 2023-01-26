@@ -43,7 +43,7 @@ function CreateShop($OAuthJson) {
     $ownerID = $OAuthJson.access_token.Substring(0, $OAuthJson.access_token.IndexOf('.'))
 
     #Get shop data
-    $requirements = GetEndpointRequirements "getShopByOwnerUserId" $OAuthJson.access_token
+    $requirements = GetEndpointRequirements "getShopByOwnerUserId" $OAuthJson.access_token $ownerID
     $shopData = MakeEtsyRequest $requirements
 
     #Create the container data so we can cache all this shit.

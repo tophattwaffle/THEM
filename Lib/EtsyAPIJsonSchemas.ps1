@@ -13,7 +13,7 @@ $global:scale_id = @{
   " inches"  = 327
 }
 
-function GetListingSchema($listing) {
+function GetInventorySchema($listing) {
   $schema = @'
     {
         "products": [],
@@ -23,9 +23,9 @@ function GetListingSchema($listing) {
       }
 '@
   $json = ConvertFrom-Json $schema
-  $json.price_on_property = $listing.price_on_property
-  $json.quantity_on_property = $listing.quantity_on_property
-  $json.sku_on_property = $listing.quantity_on_property
+  $json.price_on_property = $listing.inventory.price_on_property
+  $json.quantity_on_property = $listing.inventory.quantity_on_property
+  $json.sku_on_property = $listing.inventory.quantity_on_property
 
   return $json
 }
@@ -34,8 +34,7 @@ function GetEmptyProductSchema() {
   $schema = @'
     {
         "sku": "",
-        "property_values": [
-        ],
+        "property_values": [],
         "offerings": [
           {
             "price": null,
@@ -66,35 +65,4 @@ function GetEmptyPropertyValuesSchema() {
 
 $json = ConvertFrom-Json $schema
 return $json
-}
-
-<#
-Providing an inventory prodcut, this will return a new structure that can be used
-in an inventory update call.
-
-TODO: Needs to be able to take products with 2 variations!!
-#>
-function GetProductScheme($product) {
-  $json = GetEmptyProductSchema
-
-  $json.sku = $product.sku
-  $json.property_values[0].property_id = $product.property_values[0].property_id
-  $json.property_values[0].value_ids = $product.property_values[0].value_ids
-  $json.property_values[0].scale_id = $product.property_values[0].scale_id
-  $json.property_values[0].property_name = $product.property_values[0].property_name
-  $json.property_values[0].values = $product.property_values[0].values
-
-  if ($product[0].offerings.price.amount -ne $null) {
-    $json.offerings[0].price = [float]$product[0].offerings.price.amount / 100
-  }
-  else {
-    $json.offerings[0].price = [float]$product[0].offerings.price
-  }
-  $json.offerings[0].quantity = $product[0].offerings.quantity
-  $json.offerings[0].is_enabled = $product[0].offerings.is_enabled
-
-  if ($json.offerings[0].price -eq $null) {
-    write-host "t"
-  }
-  return $json
 }

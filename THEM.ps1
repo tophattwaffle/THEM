@@ -27,6 +27,18 @@ function UpdateVariations() {
 #Starting up the script...
 Init
 
+
+# $testList = $global:allShops[0].allListings[3]
+
+# $variations = GetAllVariationsFromListing $testList
+
+# $l = CreateUpdateListingInventoryFromList $testlist $variations
+# $json = ConvertTo-Json $l -Depth 99
+
+# $res = UpdateListingInventory $testList.listing_id $json $global:allShops[0].accessToken
+# $res
+
+
 #Main loop for program.
 while ($true) {
     MainMenu

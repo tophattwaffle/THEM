@@ -31,7 +31,7 @@ function GetAllOpenOrders($shopId, $bearerToken) {
 Takes a listing ID and JSON formatted body of inventory to update for the provided listing ID
 #>
 function UpdateListingInventory ($listingId, $body, $accessToken) {
-    $requestRequirements = GetEndpointRequirements "updateListingInventory" $bearerToken $shopId
+    $requestRequirements = GetEndpointRequirements "updateListingInventory" $accessToken $listingId
     $result = MakeEtsyRequest $requestRequirements $body
     return $result.results
 }
