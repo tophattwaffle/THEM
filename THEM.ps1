@@ -7,7 +7,6 @@ try {
     . ("$ScriptDirectory\Lib\EtsyAPIRequestHandlers.ps1")
     . ("$ScriptDirectory\Lib\EtsyAPIUtilities.ps1")
     . ("$ScriptDirectory\Lib\EtsyAPIJsonSchemas.ps1")
-    . ("$ScriptDirectory\Lib\EtsyAPITables.ps1")
     . ("$ScriptDirectory\Lib\THEMFunctions.ps1")
 }
 catch {
@@ -27,8 +26,6 @@ function UpdateVariations() {
 
 #Starting up the script...
 Init
-
-
 
 #Main loop for program.
 while ($true) {

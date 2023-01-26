@@ -43,8 +43,8 @@ function CreateShop($OAuthJson) {
     $ownerID = $OAuthJson.access_token.Substring(0, $OAuthJson.access_token.IndexOf('.'))
 
     #Get shop data
-    $url = "https://openapi.etsy.com/v3/application/users/$($ownerID)/shops"
-    $shopData = MakeOAuthRequest $OAuthJson.access_token $url $null 'GET'
+    $requirements = GetEndpointRequirements "getShopByOwnerUserId" $OAuthJson.access_token
+    $shopData = MakeEtsyRequest $requirements
 
     #Create the container data so we can cache all this shit.
     $ShopContainer = [PSCustomObject]@{
@@ -93,30 +93,6 @@ function AddShop() {
     UpdateShopFromEtsy $shopInfo
     $global:allShops.add($shopInfo)
     SaveShopsToFile
-}
-
-<#
-Not used currently, may remove
-#>
-function CreateVariationLayoutFromListing($listing) {
-    #This is like this because... fuck me man this is all I could think of for right now. Makes it more manageable in the CSV
-    $variation = '' | Select name, listing_id, shop_id, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24, s25, s26, s27, s28, s29
-    $variation.name = $listing.title.substring(0, 30)
-    $variation.listing_id = $listing.listing_id
-    $variation.shop_id = $listing.shop_id
-
-    for ($i = 0; $i -lt $listing.variations.values.count; $i++) {
-        #Is the variable target a primary or secondar variation
-        $varPrefix = If ($i -eq 0) { "p" } Else { "s" }
-        
-        #Go through the list object attached to the dictionary
-        for ($j = 0; $j -lt @($listing.variations.values)[$i].count; $j++) {
-            $targetVar = "$($varPrefix)$($j)"
-            SetValue $variation $targetVar @($listing.variations.values)[$i][$j]
-        }
-    }
-
-    return $variation
 }
 
 <#

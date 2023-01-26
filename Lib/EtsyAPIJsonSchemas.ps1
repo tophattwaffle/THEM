@@ -6,7 +6,11 @@ $global:property_id = @{
   "CUSTOM1"        = 513
   "CUSTOM2"        = 514
   "Size"           = 100
+}
 
+#That space at the front is NOT a mistake...
+$global:scale_id = @{
+  " inches"  = 327
 }
 
 function GetListingSchema($listing) {
@@ -42,9 +46,6 @@ function GetEmptyProductSchema() {
       }
 '@
   $json = ConvertFrom-Json $schema
-
-  $json.property_values += (GetEmptyPropertyValuesSchema)
-
   return $json
 }
 

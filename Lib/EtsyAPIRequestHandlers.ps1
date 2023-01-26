@@ -1,27 +1,31 @@
 Write-Host "Loading EtsyAPIRequestHandlers..." -ForegroundColor Magenta
 
+$global:property_id = @{
+    "Primary color"  = 200
+    "Seconday color" = 52047899002
+    "CUSTOM1"        = 513
+    "CUSTOM2"        = 514
+    "Size"           = 100
+
+}
+
+$global:endpoints = @{}
+$global:baseUrl = "https://openapi.etsy.com/v3/application/"
+
+function SetupEndpoints() {
+    $global:endpoints.Add("getListingsByShop", (CreateEndpointRequirement "shops/{shop_id}/listings?limit=100&includes=inventory" $true $true 'GET' $null))
+    $global:endpoints.Add("getListingsByShop_draftOnly", (CreateEndpointRequirement "shops/{shop_id}/listings?limit=100&includes=inventory&state=draft" $true $true 'GET' $null))
+    $global:endpoints.Add("getShopReceipts", (CreateEndpointRequirement "shops/{shop_id}/receipts?limit=100&was_paid=true&was_shipped=false" $true $true 'GET' $null))
+    $global:endpoints.Add("updateListingInventory", (CreateEndpointRequirement "listings/{listing_id}/inventory" $true $true 'PUT' "application/json"))
+    $global:endpoints.Add("getShopByOwnerUserId", (CreateEndpointRequirement "users/{user_id}/shops" $true $false 'GET' $null))
+}
+
 <#
 Returns a dictionary containing all the needed headers to make an OAuth request.
 #>
-function GetOAuthRequestHeaders($authToken, $reqType) {
-    $dict = NewDictionary
-
-    $dict.add("x-api-key", $global:apiKey)
-    $dict.add("Authorization", "Bearer $authToken")
-
-    if ($reqType -like 'PUT') {
-        $dict.add("Content-Type", "application/json")
-    }
-    else {
-        $dict.add("Content-Type", "application/x-www-form-urlencoded")
-    }
-
-    return $dict
-}
-
 function MakeEtsyRequest($requirements, $payload = $null)
 {
-    if ($payload -eq $null) {
+    if ($null -eq $payload) {
         return Invoke-RestMethod -Uri $requirements.url -Headers $requirements.headers -Method $requirements.requestType -MaximumRedirection 5
     }
     else {
@@ -29,46 +33,56 @@ function MakeEtsyRequest($requirements, $payload = $null)
     }
 }
 
-<#
-Makes an OAuth request to the provided endpoint.
-#>
-function MakeOAuthRequest($bearerToken, $url, $body, $requestType) {
-    $reqHeaders = GetOAuthRequestHeaders $bearerToken $requestType
-
-    if ($body -eq $null) {
-        $result = Invoke-RestMethod -Uri $url -Headers $reqHeaders -Method $requestType -MaximumRedirection 5
-    }
-    else {
-        $result = Invoke-RestMethod -Uri $url -Headers $reqHeaders -Method $requestType -MaximumRedirection 5 -Body $body
-    }
-
-    return $result
-}
 
 <#
-Gets the required headers for a request that only needs an API key.
+Takes an endpoint name and returns all the requirements for it.
+Replace can take a string array and then replace the variables in the URL in order.
 #>
-function GetAPIKeyRequestHeaders() {
+function GetEndpointRequirements($endpoint, $authToken, $replace = $null) {
+    $requirements = $global:endpoints.Get_Item($endpoint)
+
     $dict = NewDictionary
-    $dict.add("Content-Type", "application/x-www-form-urlencoded")
-    $dict.add("x-api-key", $global:apiKey)
 
-    return $dict
-}
+    if ($requirements.requiresApi) {
+        $dict.add("x-api-key", $global:apiKey)
+    }
 
-<#
-Makes an API key request.
-#>
-function MakeAPIKeyRequest($url, $body, $requestType) {
+    if ($requirements.requiresOAuth) {
+        $dict.add("Authorization", "Bearer $authToken")
+    }
 
-    $reqHeaders = GetAPIKeyRequestHeaders
+    if ($requirements.contentType -ne $null) {
+        $dict.add("Content-Type", $requirements.contentType)
+    }
 
-    if ($body -ne $null) {
-        $result = Invoke-RestMethod -Uri $url -Headers $reqHeaders -Body $body -Method $requestType -MaximumRedirection 5
+    $endpoint = [PSCustomObject]@{
+        headers     = $dict
+        url         = "$($global:baseUrl)$($requirements.url)"
+        requestType = $requirements.requestType
+    }
+
+    $match = [Regex]::Matches($endpoint.url, '\{(.*?)\}')
+
+    if ($match.Count -eq 1) {
+        $endpoint.url = $endpoint.url.Replace($match[0].value, $replace)
     }
     else {
-        $result = Invoke-RestMethod -Uri $url -Headers $reqHeaders -Method $requestType -MaximumRedirection 5
+        for ($i = 0; $i -lt $match.Count; $i++) {
+            $endpoint.url.Replace($match[$i].value, $replace[$i])
+        }
     }
 
-    return $result
+    return $endpoint
+}
+
+function CreateEndpointRequirement($url, $requiresApi, $requiresOAuth, $requestType, $contentType) {
+    $endpoint = [PSCustomObject]@{
+        url           = $url
+        requiresApi   = $requiresApi
+        requiresOAuth = $requiresOAuth
+        contentType   = $contentType
+        requestType   = $requestType
+    }
+
+    return $endpoint
 }
