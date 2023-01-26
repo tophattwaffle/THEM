@@ -1,30 +1,29 @@
 Write-Host "Loading EtsyAPICalls..." -ForegroundColor Magenta
 
 <#
-Gets all ACTIVE listings for a shopIP
+Gets all ACTIVE listings for a shopID
 #>
 function GetAllListings($shopId, $bearerToken) {
 
-
-    $url = "https://openapi.etsy.com/v3/application/shops/$($shopId)/listings?limit=100&includes=inventory"
-
     if($global:DraftsOnly)
     {
-        $url += "&state=draft"
+        $requestRequirements = GetEndpointRequirements "getListingsByShop_draftOnly" $bearerToken $shopId
+    }
+    else {
+        $requestRequirements = GetEndpointRequirements "getListingsByShop" $bearerToken $shopId
     }
 
-    $result = MakeOAuthRequest $bearerToken $url $null 'GET'
-    $result = $result.results
+    $result = MakeEtsyRequest $requestRequirements
 
-    return $result
+    return $result.results
 }
 
 <#
 Gets all open orders for a shop ID
 #>
 function GetAllOpenOrders($shopId, $bearerToken) {
-    $url = "https://openapi.etsy.com/v3/application/shops/$($shopId)/receipts?was_paid=true&was_shipped=false"
-    $result = MakeOAuthRequest $bearerToken $url $null 'GET'
+    $requestRequirements = GetEndpointRequirements "getShopReceipts" $bearerToken $shopId
+    $result = MakeEtsyRequest $requestRequirements
     return $result.results
 }
 
@@ -32,7 +31,7 @@ function GetAllOpenOrders($shopId, $bearerToken) {
 Takes a listing ID and JSON formatted body of inventory to update for the provided listing ID
 #>
 function UpdateListingInventory ($listingId, $body, $accessToken) {
-    $url = "https://openapi.etsy.com/v3/application/listings/$listingId/inventory"
-    $result = MakeOAuthRequest $global:allShops[0].accessToken $url $body 'PUT'
-    return $result
+    $requestRequirements = GetEndpointRequirements "updateListingInventory" $bearerToken $shopId
+    $result = MakeEtsyRequest $requestRequirements $body
+    return $result.results
 }

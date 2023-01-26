@@ -1,5 +1,8 @@
 Write-Host "Loading EtsyAPIRequestHandlers..." -ForegroundColor Magenta
 
+<#
+Returns a dictionary containing all the needed headers to make an OAuth request.
+#>
 function GetOAuthRequestHeaders($authToken, $reqType) {
     $dict = NewDictionary
 
@@ -16,6 +19,19 @@ function GetOAuthRequestHeaders($authToken, $reqType) {
     return $dict
 }
 
+function MakeEtsyRequest($requirements, $payload = $null)
+{
+    if ($payload -eq $null) {
+        return Invoke-RestMethod -Uri $requirements.url -Headers $requirements.headers -Method $requirements.requestType -MaximumRedirection 5
+    }
+    else {
+        return Invoke-RestMethod -Uri $requirements.url -Headers $requirements.headers -Method $requirements.requestType -MaximumRedirection 5 -Body $payload
+    }
+}
+
+<#
+Makes an OAuth request to the provided endpoint.
+#>
 function MakeOAuthRequest($bearerToken, $url, $body, $requestType) {
     $reqHeaders = GetOAuthRequestHeaders $bearerToken $requestType
 
@@ -29,6 +45,9 @@ function MakeOAuthRequest($bearerToken, $url, $body, $requestType) {
     return $result
 }
 
+<#
+Gets the required headers for a request that only needs an API key.
+#>
 function GetAPIKeyRequestHeaders() {
     $dict = NewDictionary
     $dict.add("Content-Type", "application/x-www-form-urlencoded")
@@ -37,6 +56,9 @@ function GetAPIKeyRequestHeaders() {
     return $dict
 }
 
+<#
+Makes an API key request.
+#>
 function MakeAPIKeyRequest($url, $body, $requestType) {
 
     $reqHeaders = GetAPIKeyRequestHeaders

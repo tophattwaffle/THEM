@@ -67,7 +67,12 @@ $json = ConvertFrom-Json $schema
 return $json
 }
 
+<#
+Providing an inventory prodcut, this will return a new structure that can be used
+in an inventory update call.
 
+TODO: Needs to be able to take products with 2 variations!!
+#>
 function GetProductScheme($product) {
   $json = GetEmptyProductSchema
 

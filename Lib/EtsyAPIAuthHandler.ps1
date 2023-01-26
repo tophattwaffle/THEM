@@ -1,4 +1,8 @@
 Write-Host "Loading AuthHandler..." -ForegroundColor Magenta
+
+<#
+Loads the API key from the saved XML file.
+#>
 function LoadAPIKey() {
     $destination = "$global:saveLocation\EtsyAPIKey.xml"
     if (Test-Path -Path $destination) {
@@ -17,6 +21,9 @@ function LoadAPIKey() {
     return $false
 }
 
+<#
+Gets the API key from the user. If valid saves it and sets it.
+#>
 function SetAPIKey() {
     while ($true) {
         $global:apiKey = read-host -Prompt "Enter API Key"
@@ -34,12 +41,16 @@ function SetAPIKey() {
     $global:apiKey | Export-Clixml $destination
 }
 $global:asd = $null
+
+<#
+Tests that the provided API key works for connecting to Etsy
+#>
 function TestAPIKey($key) {
     write-host "Testing connecting to Etsy API..."
     $header = NewDictionary
     $header.add("x-api-key", $key)
 
-    $url = "https://api.etsy.com/v3/application/openapi-ping"
+    $url = "$($global:baseUrl)openapi-ping"
 
     $result = Invoke-WebRequest -Uri $url -Headers $header -Method 'GET' -MaximumRedirection 5 -ErrorAction SilentlyContinue
     if ($result.StatusCode -eq 200) {
@@ -49,11 +60,19 @@ function TestAPIKey($key) {
     return $result
 }
 
+<#
+Takes a string and converts it to base64.
+Needed to OAuth process.
+#>
 function Base64URLEncode($text) {
     $base64 = [System.Convert]::ToBase64String($text)
     return $base64.replace("+", "-").replace("/", "_").replace("=", "")
 }
 
+<#
+Creates a new SHA256 hash.
+Needed to OAuth process.
+#>
 function CreateHash {
     Param (
         [Parameter(Mandatory = $true)]
@@ -66,6 +85,10 @@ function CreateHash {
     return $hash
 }
 
+<#
+Generates a unique code to be used in a challange.
+Needed to OAuth process.
+#>
 function CodeGenerator() {
     #gets 32 random bytes
     $randomBytes = 1..32 | % { [byte](Get-Random -Minimum ([byte]::MinValue) -Maximum ([byte]::MaxValue)) }
@@ -80,6 +103,10 @@ function CodeGenerator() {
     return $global:codeChallenge
 }
 
+<#
+Creates the Connection URL for initial connection to Etsy.
+Needed to OAuth process.
+#>
 function GetConnectURL() {
     $formattedScopes = ""
 
@@ -103,6 +130,9 @@ function GetConnectURL() {
     return $BaseURL
 }
 
+<#
+Requests a new OAuth token from Etsy.
+#>
 function GetOAuthToken($authKey) {
     $tokenUrl = "https://api.etsy.com/v3/public/oauth/token"
     $headers = NewDictionary
@@ -122,6 +152,9 @@ function GetOAuthToken($authKey) {
     return $result
 }
 
+<#
+Refreshes the OAuth token for the provided shop.
+#>
 function RefreshOAuth($shop) {
     write-host "Attempting token refresh for $($shop.shop_name)..." -ForegroundColor Yellow
     $headers = NewDictionary
@@ -147,4 +180,36 @@ function RefreshOAuth($shop) {
 
     write-host "`tRefresh failure!" -ForegroundColor Red
     return $false
+}
+
+<#
+Starts the script by loading all needed data and verifying connection to Etsy.
+#>
+function Init {
+
+    #Make the folder for saving data, if needed.
+    if (!(Test-Path $global:saveLocation)) {
+        New-Item -ItemType Directory -Force -Path $global:saveLocation
+    }
+
+    SetupEndpoints
+
+    $apiLoadResult = LoadAPIKey
+
+    #Saved API key invalid, or didn't work. Get new API key from user.
+    if (!$apiLoadResult) {
+        SetAPIKey
+    }
+
+    #Load saved shops from file
+    LoadShopsFromFile
+
+    foreach ($shop in $global:allShops) {
+        RefreshOAuth $shop | Out-Null
+        if (!$global:dontRefreshOnLoad) {
+            UpdateShopFromEtsy $shop
+            SaveShopsToFile
+        }
+    }
+    #Save shops after the initial refresh
 }
