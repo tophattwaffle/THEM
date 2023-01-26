@@ -2,7 +2,7 @@ Write-Host "Loading EtsyAPIJsonSchemas..." -ForegroundColor Magenta
 
 $global:property_id = @{
   "Primary color"  = 200
-  "Seconday color" = 52047899002
+  "Secondary color" = 52047899002
   "CUSTOM1"        = 513
   "CUSTOM2"        = 514
   "Size"           = 100

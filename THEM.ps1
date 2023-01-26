@@ -28,15 +28,26 @@ function UpdateVariations() {
 Init
 
 
-# $testList = $global:allShops[0].allListings[3]
+$testList = $global:allShops[0].allListings[3]
 
-# $variations = GetAllVariationsFromListing $testList
+$variations = GetAllVariationsFromListing $testList
 
-# $l = CreateUpdateListingInventoryFromList $testlist $variations
-# $json = ConvertTo-Json $l -Depth 99
+$variations += [NoPriceVariation]@{
+    property_name = "Secondary color"
+    value = "Yeet"
+}
+$variations += [NoPriceVariation]@{
+    property_name = "Secondary color"
+    value = "Skeet"
+}
 
-# $res = UpdateListingInventory $testList.listing_id $json $global:allShops[0].accessToken
-# $res
+$l = CreateUpdateListingInventoryFromList $testlist $variations
+
+
+$json = ConvertTo-Json $l -Depth 99
+
+$res = UpdateListingInventory $testList.listing_id $json $global:allShops[0].accessToken
+$res
 
 
 #Main loop for program.

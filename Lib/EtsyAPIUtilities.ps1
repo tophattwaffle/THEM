@@ -131,7 +131,6 @@ function GetAllVariationsFromListing($listing) {
 class NoPriceVariation {
     [string]$property_name
     [string]$value
-    [float]$price
 }
 
 class SinglePriceVariation {
@@ -151,24 +150,11 @@ class DoublePriceVariation {
 }
 
 function CreateUpdateListingInventoryFromList($product, $list) {
-    #Determine the number of variations in the list.
-    $variationNames = [System.Collections.Generic.List[String]]::new()
-    foreach ($i in $list) {
-        $variationNames.Add($i.property_name)
-    }
-    $variationNames = $variationNames | Select-Object -Unique
+
 
     switch ($list[0].GetType().Name) {
-        #De dupe, sort output
         "NoPriceVariation" {
-            #Single variation
-            if ($variationNames.count -eq 1) {
-                $result = CreateJsonSingleVariationNoPricing $product $list
-            }
-            elseif ($variationNames.count -eq 2) {
-
-            }
-            
+            $result = CreateJsonSingleVariationNoPricing $product $list
         }
 
         "SinglePriceVariation" {
@@ -184,18 +170,41 @@ function CreateUpdateListingInventoryFromList($product, $list) {
     return $result
 }
 
+function GetVariationTitlesFromList($list) {
+    #Determine the number of variations in the list.
+    $variationNames = [System.Collections.Generic.List[String]]::new()
+    foreach ($i in $list) {
+        $variationNames.Add($i.property_name)
+    }
+    return $variationNames | Select-Object -Unique
+}
+
 <#
 Provided with a product and a list of SINGLE variations (Eg. Only Primary color)
 Returns an inventory schema that can be sent with UpdateListingInventory call
 #>
 function CreateJsonSingleVariationNoPricing($product, $list) {
+    $variationsTitles = GetVariationTitlesFromList $list
+    #If we have 2 different variations, split the lists.
+    if ($variationsTitles.count -eq 2) {
+        $var2list = $list | Where-Object property_name -like $variationsTitles[1]
+        $var1list = $list | Where-Object property_name -like $variationsTitles[0]
+
+        $list = [System.Collections.Generic.List[Object]]::new()
+        #For item in the 2nd list, copy the first list onto itself.
+        foreach($i in $var2list)
+        {
+            $list.AddRange($var1list)
+        }
+    }
+
     $inventorySchema = GetInventorySchema $product
     foreach ($i in $list) {
         $productSchema = GetEmptyProductSchema
 
         $productSchema.property_values += (GetEmptyPropertyValuesSchema)
 
-        $productSchema.sku = if($null -eq $product.sku) {""} else {$product.sku}
+        $productSchema.sku = if ($null -eq $product.sku) { "" } else { $product.sku }
         $productSchema.property_values[0].property_id = ($global:property_id.Item($i.property_name))
         $productSchema.property_values[0].scale_id = $null #TODO: Handle scale_Id
         $productSchema.property_values[0].property_name = $i.property_name
@@ -206,10 +215,27 @@ function CreateJsonSingleVariationNoPricing($product, $list) {
         $productSchema.offerings[0].is_enabled = $true
 
         #Always strip value IDs
-        $productSchema.property_values | %{$_.psobject.members.remove('value_ids')}
+        $productSchema.property_values | % { $_.psobject.members.remove('value_ids') }
 
         $inventorySchema.products += $productSchema
     }
 
+    #single variation, return here.
+    if ($variationsTitles.count -ne 2) {return $inventorySchema}
+
+    
+    for($i = 0;$i -lt $list.count; $i += $var2list.count)
+    {
+        for($j = 0; $j -lt $var2list.count; $j++)
+        {
+            $inventorySchema.products[$i+$j].property_values += (GetEmptyPropertyValuesSchema)
+            $inventorySchema.products[$i+$j].property_values[1].property_id = ($global:property_id.Item($var2list[$j].property_name))
+            $inventorySchema.products[$i+$j].property_values[1].scale_id = $null #TODO: Handle scale_Id
+            $inventorySchema.products[$i+$j].property_values[1].property_name = $var2list[$j].property_name
+            $inventorySchema.products[$i+$j].property_values[1].values[0] = $var2list[$j].value
+
+            $inventorySchema.products[$i+$j].property_values | % { $_.psobject.members.remove('value_ids') }
+        }
+    }
     return $inventorySchema
 }
