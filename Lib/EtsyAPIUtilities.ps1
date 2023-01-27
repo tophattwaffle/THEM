@@ -50,23 +50,23 @@ function GetAllVariationsFromListing($listing) {
     $pricingProperties = $listing.inventory.price_on_property
 
     #Handle NO pricing variations. Parse each variation into it's own object and shove into list.
-    if ($pricingProperties.count -eq 0) {
-        foreach ($product in $listing.inventory.products) {
-            foreach ($prop_value in $product.property_values) {
-                $list.Add(([NoPriceVariation]@{
-                            property_name = $prop_value.property_name
-                            value         = $prop_value.values[0]
-                            scale_id    = $prop_values.scale_id
-                        }))
-            }
-        }
-    }
+    # if ($pricingProperties.count -eq 0) {
+    #     foreach ($product in $listing.inventory.products) {
+    #         foreach ($prop_value in $product.property_values) {
+    #             $list.Add(([NoPriceVariation]@{
+    #                         property_name = $prop_value.property_name
+    #                         value         = $prop_value.values[0]
+    #                         scale_id    = $prop_values.scale_id
+    #                     }))
+    #         }
+    #     }
+    # }
 
     #Handle pricing on a single property!
-    elseif ($pricingProperties.count -eq 1) {
+    if ($pricingProperties.count -le 1) {
         foreach ($product in $listing.inventory.products) {
             
-            $list.Add([SinglePriceVariation]@{
+            $list.Add([SingleOrNoPriceVariation]@{
                     price_on_property = $pricingProperties[0]
                     property_name     = $product.property_values[0].property_name
                     value             = $product.property_values[0].values[0]
@@ -115,11 +115,7 @@ function GetAllVariationsFromListing($listing) {
     #return based on the type.
     switch ($list[0].GetType().Name) {
         #De dupe, sort output
-        "NoPriceVariation" {
-            return $list | Group-Object -Property 'property_name', 'value' | ForEach-Object { $_.Group[0] } | Sort-Object -Property 'property_name'
-        }
-
-        "SinglePriceVariation" {
+        "SingleOrNoPriceVariation" {
             return $list | Group-Object -Property 'property_name', 'value' | ForEach-Object { $_.Group[0] } | Sort-Object -Property 'property_name'
         }
 
@@ -133,16 +129,16 @@ function GetAllVariationsFromListing($listing) {
     return $null
 }
 
-class NoPriceVariation {
-    [string]$property_name
-    [string]$value
-    [nullable[int]]$scale_id
-}
+# class NoPriceVariation {
+#     [string]$property_name
+#     [string]$value
+#     [nullable[int]]$scale_id
+# }
 
-class SinglePriceVariation {
+class SingleOrNoPriceVariation {
     [string]$property_name
     [string]$value
-    [int]$price_on_property
+    [nullable[int]]$price_on_property
     [nullable[float]]$price
     [nullable[int]]$scale_id
 }
@@ -161,12 +157,8 @@ function CreateUpdateListingInventoryFromList($product, $list) {
 
 
     switch ($list[0].GetType().Name) {
-        "NoPriceVariation" {
-            $result = CreateJsonNoPriceVariation $product $list
-        }
-
-        "SinglePriceVariation" {
-            
+        "SingleOrNoPriceVariation" {
+            $result = CreateJsonSingleOrNoPriceVariation $product $list
         }
 
         #I don't think order matters for this one???
@@ -191,7 +183,7 @@ function GetVariationTitlesFromList($list) {
 Provided with a product and a list with no price variations
 Returns an inventory schema that can be sent with UpdateListingInventory call
 #>
-function CreateJsonNoPriceVariation($product, $list) {
+function CreateJsonSingleOrNoPriceVariation($product, $list) {
     $variationsTitles = GetVariationTitlesFromList $list
     #If we have 2 different variations, split the lists.
     if ($variationsTitles.count -eq 2) {
@@ -205,6 +197,9 @@ function CreateJsonNoPriceVariation($product, $list) {
         }
     }
 
+    #Sort the list, this is needed for when we handle the 2nd variation later
+    $list = $list | Sort-Object -Property {$_.value}
+
     $inventorySchema = GetInventorySchema $product
     foreach ($i in $list) {
         $productSchema = GetEmptyProductSchema
@@ -217,7 +212,14 @@ function CreateJsonNoPriceVariation($product, $list) {
         $productSchema.property_values[0].property_name = $i.property_name
         $productSchema.property_values[0].values[0] = $i.value
 
-        $productSchema.offerings[0].price = $product.price.amount / $product.price.divisor
+        if($null -eq $i.price)
+        {
+            $productSchema.offerings[0].price = $product.price.amount / $product.price.divisor
+        }
+        else {
+            $productSchema.offerings[0].price = $i.price
+        }
+
         $productSchema.offerings[0].quantity = $product.quantity
         $productSchema.offerings[0].is_enabled = $true
 
@@ -226,7 +228,6 @@ function CreateJsonNoPriceVariation($product, $list) {
 
     #single variation, return here.
     if ($variationsTitles.count -ne 2) { return $inventorySchema }
-
     
     for ($i = 0; $i -lt $list.count; $i += $var2list.count) {
         for ($j = 0; $j -lt $var2list.count; $j++) {
@@ -235,7 +236,9 @@ function CreateJsonNoPriceVariation($product, $list) {
             $inventorySchema.products[$i + $j].property_values[1].scale_id = $var2list[$j].scale_id
             $inventorySchema.products[$i + $j].property_values[1].property_name = $var2list[$j].property_name
             $inventorySchema.products[$i + $j].property_values[1].values[0] = $var2list[$j].value
-
+            write-host ($i + $j)
+            write-host $i $j
+            write-host $inventorySchema.products[$i + $j].property_values[0].values[0] $inventorySchema.products[$i + $j].property_values[1].values[0]
         }
     }
     return $inventorySchema

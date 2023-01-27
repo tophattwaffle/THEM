@@ -36,19 +36,31 @@ $variations = GetAllVariationsFromListing $testList
 
 $variations = [System.Collections.Generic.List[Object]]::new()
 
-$variations += [NoPriceVariation]@{
-    property_name = "Size"
-    value = "6"
-    scale_id = 327
+$variations += [SingleOrNoPriceVariation]@{
+    property_name = "Primary color"
+    value = "asd"
+    price = 1
+
 }
-$variations += [NoPriceVariation]@{
-    property_name = "Size"
-    value = "9"
-    scale_id = 327
+$variations += [SingleOrNoPriceVariation]@{
+    property_name = "Primary color"
+    value = "987"
+    price = 6.50
+
+}
+$variations += [SingleOrNoPriceVariation]@{
+    property_name = "Secondary color"
+    value = "sss"
+
+}
+$variations += [SingleOrNoPriceVariation]@{
+    property_name = "Secondary color"
+    value = "ddd"
+
 }
 
 $l = CreateUpdateListingInventoryFromList $testlist $variations
-
+$l.price_on_property += 200
 
 $json = ConvertTo-Json $l -Depth 99
 
