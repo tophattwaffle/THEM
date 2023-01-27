@@ -56,6 +56,7 @@ function GetAllVariationsFromListing($listing) {
                 $list.Add(([NoPriceVariation]@{
                             property_name = $prop_value.property_name
                             value         = $prop_value.values[0]
+                            scale_id    = $prop_values.scale_id
                         }))
             }
         }
@@ -70,6 +71,7 @@ function GetAllVariationsFromListing($listing) {
                     property_name     = $product.property_values[0].property_name
                     value             = $product.property_values[0].values[0]
                     price             = $product.offerings[0].price.amount / $product.offerings[0].price.divisor
+                    scale_id    = $prop_values.scale_id
                 })
 
             #There is a 2nd variation on listing
@@ -79,6 +81,7 @@ function GetAllVariationsFromListing($listing) {
                         property_name     = $product.property_values[1].property_name
                         value             = $product.property_values[1].values[0]
                         price             = $product.offerings[0].price.amount / $product.offerings[0].price.divisor
+                        scale_id    = $prop_values.scale_id
                     })
             }
         }
@@ -103,10 +106,12 @@ function GetAllVariationsFromListing($listing) {
                     value2            = $product.property_values[1].values[0]
                     price_on_property = $pricingProperties.ToArray()
                     price             = $product.offerings[0].price.amount / $product.offerings[0].price.divisor
+                    scale_id    = $prop_values.scale_id
                 })
         }
     }
-    
+
+  
     #return based on the type.
     switch ($list[0].GetType().Name) {
         #De dupe, sort output
@@ -131,6 +136,7 @@ function GetAllVariationsFromListing($listing) {
 class NoPriceVariation {
     [string]$property_name
     [string]$value
+    [nullable[int]]$scale_id
 }
 
 class SinglePriceVariation {
@@ -138,6 +144,7 @@ class SinglePriceVariation {
     [string]$value
     [int]$price_on_property
     [nullable[float]]$price
+    [nullable[int]]$scale_id
 }
 
 class DoublePriceVariation {
@@ -147,6 +154,7 @@ class DoublePriceVariation {
     [string]$value2
     [int64[]]$price_on_property = [int64[]]::new(2)
     [float]$price
+    [nullable[int]]$scale_id
 }
 
 function CreateUpdateListingInventoryFromList($product, $list) {
@@ -154,7 +162,7 @@ function CreateUpdateListingInventoryFromList($product, $list) {
 
     switch ($list[0].GetType().Name) {
         "NoPriceVariation" {
-            $result = CreateJsonSingleVariationNoPricing $product $list
+            $result = CreateJsonNoPriceVariation $product $list
         }
 
         "SinglePriceVariation" {
@@ -180,10 +188,10 @@ function GetVariationTitlesFromList($list) {
 }
 
 <#
-Provided with a product and a list of SINGLE variations (Eg. Only Primary color)
+Provided with a product and a list with no price variations
 Returns an inventory schema that can be sent with UpdateListingInventory call
 #>
-function CreateJsonSingleVariationNoPricing($product, $list) {
+function CreateJsonNoPriceVariation($product, $list) {
     $variationsTitles = GetVariationTitlesFromList $list
     #If we have 2 different variations, split the lists.
     if ($variationsTitles.count -eq 2) {
@@ -192,8 +200,7 @@ function CreateJsonSingleVariationNoPricing($product, $list) {
 
         $list = [System.Collections.Generic.List[Object]]::new()
         #For item in the 2nd list, copy the first list onto itself.
-        foreach($i in $var2list)
-        {
+        foreach ($i in $var2list) {
             $list.AddRange($var1list)
         }
     }
@@ -205,8 +212,8 @@ function CreateJsonSingleVariationNoPricing($product, $list) {
         $productSchema.property_values += (GetEmptyPropertyValuesSchema)
 
         $productSchema.sku = if ($null -eq $product.sku) { "" } else { $product.sku }
-        $productSchema.property_values[0].property_id = ($global:property_id.Item($i.property_name))
-        $productSchema.property_values[0].scale_id = $null #TODO: Handle scale_Id
+        $productSchema.property_values[0].property_id = (GetProperty_id $i.property_name)
+        $productSchema.property_values[0].scale_id = $i.scale_id
         $productSchema.property_values[0].property_name = $i.property_name
         $productSchema.property_values[0].values[0] = $i.value
 
@@ -214,27 +221,21 @@ function CreateJsonSingleVariationNoPricing($product, $list) {
         $productSchema.offerings[0].quantity = $product.quantity
         $productSchema.offerings[0].is_enabled = $true
 
-        #Always strip value IDs
-        $productSchema.property_values | % { $_.psobject.members.remove('value_ids') }
-
         $inventorySchema.products += $productSchema
     }
 
     #single variation, return here.
-    if ($variationsTitles.count -ne 2) {return $inventorySchema}
+    if ($variationsTitles.count -ne 2) { return $inventorySchema }
 
     
-    for($i = 0;$i -lt $list.count; $i += $var2list.count)
-    {
-        for($j = 0; $j -lt $var2list.count; $j++)
-        {
-            $inventorySchema.products[$i+$j].property_values += (GetEmptyPropertyValuesSchema)
-            $inventorySchema.products[$i+$j].property_values[1].property_id = ($global:property_id.Item($var2list[$j].property_name))
-            $inventorySchema.products[$i+$j].property_values[1].scale_id = $null #TODO: Handle scale_Id
-            $inventorySchema.products[$i+$j].property_values[1].property_name = $var2list[$j].property_name
-            $inventorySchema.products[$i+$j].property_values[1].values[0] = $var2list[$j].value
+    for ($i = 0; $i -lt $list.count; $i += $var2list.count) {
+        for ($j = 0; $j -lt $var2list.count; $j++) {
+            $inventorySchema.products[$i + $j].property_values += (GetEmptyPropertyValuesSchema)
+            $inventorySchema.products[$i + $j].property_values[1].property_id = (GetProperty_id $var2list[$j].property_name)
+            $inventorySchema.products[$i + $j].property_values[1].scale_id = $var2list[$j].scale_id
+            $inventorySchema.products[$i + $j].property_values[1].property_name = $var2list[$j].property_name
+            $inventorySchema.products[$i + $j].property_values[1].values[0] = $var2list[$j].value
 
-            $inventorySchema.products[$i+$j].property_values | % { $_.psobject.members.remove('value_ids') }
         }
     }
     return $inventorySchema

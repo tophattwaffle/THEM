@@ -20,7 +20,7 @@ How to get this running:
 
 Data is stored in your `Documents/EtsyAPI directory`. At the moment *no stored data is encrypted*. If you want to "default" the script, delete the stored XML data.
 
-## Additional Information - 
+## Additional Information
 There are various configuration options inside `Lib\EtsyAPIGlobalVars.ps1`
  - `$global:dontRefresh` is a `bool` variable that determines if shop data should be automatically refreshed on script load.
 	 - The use case for this variable is for testing purposes to not constantly hammer the EtsyAPI for refreshes. You can manually refresh the shop data from the main menu.
@@ -31,3 +31,18 @@ There are various configuration options inside `Lib\EtsyAPIGlobalVars.ps1`
  - `$global:redirectURL` is a `string` of your callback URL
 
  - `$global:saveLocation` is a `string` of a path for where all data should be stored.
+
+ ## Etsy ID tables
+ Puttings these here for quick reference later on. Etsy does not seem to have these documented.
+
+| property_id     | Value       |
+|-----------------|-------------|
+| Primary color   | 200         |
+| Secondary color | 52047899002 |
+| CUSTOM1         | 513         |
+| CUSTOM2         | 514         |
+| Size            | 100         |
+
+| scale_id        | Value       |
+|-----------------|-------------|
+| Inches          | 327         |

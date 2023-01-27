@@ -11,6 +11,8 @@ try {
 }
 catch {
     Write-Host "Error while loading supporting PowerShell Scripts" -ForegroundColor Red
+    Write-Host $_
+    exit
 }
 #endregion
 
@@ -32,13 +34,17 @@ $testList = $global:allShops[0].allListings[3]
 
 $variations = GetAllVariationsFromListing $testList
 
+$variations = [System.Collections.Generic.List[Object]]::new()
+
 $variations += [NoPriceVariation]@{
-    property_name = "Secondary color"
-    value = "Yeet"
+    property_name = "Size"
+    value = "6"
+    scale_id = 327
 }
 $variations += [NoPriceVariation]@{
-    property_name = "Secondary color"
-    value = "Skeet"
+    property_name = "Size"
+    value = "9"
+    scale_id = 327
 }
 
 $l = CreateUpdateListingInventoryFromList $testlist $variations

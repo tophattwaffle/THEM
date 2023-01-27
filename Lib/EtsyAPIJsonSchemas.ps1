@@ -8,9 +8,12 @@ $global:property_id = @{
   "Size"           = 100
 }
 
-#That space at the front is NOT a mistake...
-$global:scale_id = @{
-  " inches"  = 327
+function GetProperty_id($string)
+{
+  foreach($i in $global:property_id.Keys)
+  {
+    if($i.contains($string)) {return $global:property_id.Item($i)}
+  }
 }
 
 function GetInventorySchema($listing) {
@@ -52,9 +55,6 @@ function GetEmptyPropertyValuesSchema() {
   $schema = @'
   {
     "property_id": null,
-    "value_ids": [
-      null
-    ],
     "scale_id": null,
     "property_name": "",
     "values": [
