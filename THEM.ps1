@@ -11,7 +11,7 @@ try {
 }
 catch {
     Write-Host "Error while loading supporting PowerShell Scripts" -ForegroundColor Red
-    Write-Host $_
+    Write-Host $_ #print error
     exit
 }
 #endregion
@@ -28,45 +28,6 @@ function UpdateVariations() {
 
 #Starting up the script...
 Init
-
-
-$testList = $global:allShops[0].allListings[3]
-
-$variations = GetAllVariationsFromListing $testList
-
-$variations = [System.Collections.Generic.List[Object]]::new()
-
-$variations += [SingleOrNoPriceVariation]@{
-    property_name = "Primary color"
-    value = "asd"
-    price = 1
-
-}
-$variations += [SingleOrNoPriceVariation]@{
-    property_name = "Primary color"
-    value = "987"
-    price = 6.50
-
-}
-$variations += [SingleOrNoPriceVariation]@{
-    property_name = "Secondary color"
-    value = "sss"
-
-}
-$variations += [SingleOrNoPriceVariation]@{
-    property_name = "Secondary color"
-    value = "ddd"
-
-}
-
-$l = CreateUpdateListingInventoryFromList $testlist $variations
-$l.price_on_property += 200
-
-$json = ConvertTo-Json $l -Depth 99
-
-$res = UpdateListingInventory $testList.listing_id $json $global:allShops[0].accessToken
-$res
-
 
 #Main loop for program.
 while ($true) {
