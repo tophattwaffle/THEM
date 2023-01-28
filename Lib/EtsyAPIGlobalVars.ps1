@@ -23,8 +23,12 @@ $global:scopes = @(
 <#
 These variables are set in the script, and you should likely not change them here.
 #>
-$global:apiKey = $null
 $global:codeChallenge = $null
 $global:codeVerifier = $null
 $global:state = $null
 $global:allShops = New-Object Collections.Generic.List[Object]
+
+$global:settings = @{
+    apiKey = $null
+    webhookUrl = $null
+}

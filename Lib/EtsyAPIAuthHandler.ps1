@@ -4,15 +4,14 @@ Write-Host "Loading AuthHandler..." -ForegroundColor Magenta
 Loads the API key from the saved XML file.
 #>
 function LoadAPIKey() {
-    $destination = "$global:saveLocation\EtsyAPIKey.xml"
-    if (Test-Path -Path $destination) {
-        $global:apiKey = Import-Clixml $destination
-        if (!$global:apiKey.Length -eq 25) {
+    $loadResult = LoadSettings
+    if ($loadResult) {
+        if (!$global:settings.apiKey.Length -eq 25) {
             Write-Host "API Key has incorrect legnth!" -ForegroundColor Red
             return $false
         }
-        
-        if (!(TestAPIKey $global:apiKey)) {
+            
+        if (!(TestAPIKey $global:settings.apiKey)) {
             Write-Host "Saved API Key did not work to Ping Etsy API..." -ForegroundColor Red
             return $false
         }
@@ -26,8 +25,8 @@ Gets the API key from the user. If valid saves it and sets it.
 #>
 function SetAPIKey() {
     while ($true) {
-        $global:apiKey = read-host -Prompt "Enter API Key"
-        $result = TestAPIKey $global:apiKey
+        $global:settings.apiKey = read-host -Prompt "Enter API Key"
+        $result = TestAPIKey $global:settings.apiKey
 
         if ($result.StatusCode -eq 200) {
             break
@@ -35,12 +34,8 @@ function SetAPIKey() {
         write-host "API did not work, please try again" -ForegroundColor Red
         write-host $result
     }
-
-    $destination = "$global:saveLocation\EtsyAPIKey.xml"
-    write-host "Writing API key to file: $destination"
-    $global:apiKey | Export-Clixml $destination
+    SaveSettings
 }
-$global:asd = $null
 
 <#
 Tests that the provided API key works for connecting to Etsy
@@ -140,7 +135,7 @@ function GetOAuthToken($authKey) {
 
     $body = [PSCustomObject]@{
         grant_type    = 'authorization_code'
-        client_id     = $global:apiKey
+        client_id     = $global:settings.apiKey
         redirect_uri  = $global:redirectURL
         code          = $authKey
         code_verifier = $global:codeVerifier
@@ -162,7 +157,7 @@ function RefreshOAuth($shop) {
 
     $requestBody = NewDictionary
     $requestBody.add("grant_type", "refresh_token")
-    $requestBody.add("client_id", $global:apiKey)
+    $requestBody.add("client_id", $global:settings.apiKey)
     $requestBody.add("refresh_token", $shop.refreshToken)
 
     $refreshUrl = "https://api.etsy.com/v3/public/oauth/token"

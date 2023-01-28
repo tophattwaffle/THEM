@@ -44,7 +44,7 @@ function GetEndpointRequirements($endpoint, $authToken, $replace = $null) {
     $dict = NewDictionary
 
     if ($requirements.requiresApi) {
-        $dict.add("x-api-key", $global:apiKey)
+        $dict.add("x-api-key", $global:settings.apiKey)
     }
 
     if ($requirements.requiresOAuth) {

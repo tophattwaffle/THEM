@@ -1,4 +1,5 @@
 # region Include required files
+$global:runMode = $args[0]
 $ScriptDirectory = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 try {
     . ("$ScriptDirectory\Lib\EtsyAPIGlobalVars.ps1")
@@ -15,15 +16,23 @@ catch {
     exit
 }
 #endregion
-
-function UpdateAllShopInventory() {
-
-}
-
 #Starting up the script...
 Init
 
-#Main loop for program.
-while ($true) {
-    MainMenu
+#Main loop for interactive program.
+if ($global:runMode -ne "auto") {
+
+
+
+
+    
+    while ($true) {
+        MainMenu
+    }
+}
+#Automate actions!
+elseif ($global:runMode -eq "auto")
+{
+    Write-host "Auto mode!"
+    RefreshAllShops #Refresh all shops so the webhooks can be published.
 }

@@ -1,15 +1,31 @@
 Write-Host "Loading THEMFunctions..." -ForegroundColor Magenta
 
+function SaveSettings() {
+    $destination = "$global:saveLocation\EtsyAPIsettings.xml"
+    write-host "Saving settings to: $destination"
+    $global:settings | Export-Clixml $destination
+}
+
+function LoadSettings() {
+    $destination = "$global:saveLocation\EtsyAPIsettings.xml"
+    if (Test-Path -Path $destination) {
+        $global:settings = Import-Clixml $destination
+        return $true
+    }
+    return $false
+}
+
 <#
 Main menu function.
 #>
 function MainMenu() {
     $RefreshAllShops = New-Object System.Management.Automation.Host.ChoiceDescription '&Refresh Shop Data', 'Asks for new shop data from Etsy'
     $AddShop = New-Object System.Management.Automation.Host.ChoiceDescription '&Add New Shop', 'Adds a new shop to be managed by this application'
-    $ExportAllShopInventory = New-Object System.Management.Automation.Host.ChoiceDescription '&Export Listing Inventory', 'Exports all listings inventories to CSV. Useful for managing variations.'
+    $ExportShopInventory = New-Object System.Management.Automation.Host.ChoiceDescription '&Export Listing Inventory', 'Exports all listings inventories to CSV. Useful for managing variations.'
     $UpdateAllShopInventory = New-Object System.Management.Automation.Host.ChoiceDescription '&Update Listing Inventory', 'Update all listings inventories based on the previously exported files.'
+    $AddWebhookURL = New-Object System.Management.Automation.Host.ChoiceDescription '&Set HA Webhook URL', 'Set the webhook URL to be used with Home Assistant'
 
-    $options = [System.Management.Automation.Host.ChoiceDescription[]]($RefreshAllShops, $AddShop, $ExportAllShopInventory, $UpdateAllShopInventory)
+    $options = [System.Management.Automation.Host.ChoiceDescription[]]($RefreshAllShops, $AddShop, $ExportShopInventory, $UpdateAllShopInventory, $AddWebhookURL)
     $title = 'What would you like to do?'
     $message = 'Please make a selection for what you would like to do...'
     $choice = $host.ui.PromptForChoice($title, $message, $options, 0)
@@ -18,7 +34,13 @@ function MainMenu() {
         1 { AddShop }
         2 { ExportAllShopInventory }
         3 { UpdateAllShopInventory }
+        4 { SetWebhookURL }
     }
+}
+
+function SetWebhookURL() {
+    $global:settings.webhookUrl = Read-Host -Prompt "Paste webhook URL"
+    SaveSettings
 }
 
 <#
@@ -27,7 +49,20 @@ Updates all loaded shops from Etsy.
 function UpdateShopFromEtsy($shop) {
     Write-host "Getting shop information for $($shop.shop_name)..." -ForegroundColor Cyan
     $shop.openOrders = GetAllOpenOrders $shop.shop_id $shop.accessToken
-    $shop.allListings = GetAllListings $shop.shop_id $shop.accessToken
+
+    if ($null -ne $global:settings.webhookUrl) {
+        $body = @{
+            shop_id    = $shop.shop_id
+            openOrders = $shop.openOrders.count
+        }
+
+        Invoke-RestMethod -Uri $global:settings.webhookUrl -Method 'POST' -Body (ConvertTo-Json $body)
+    }
+
+    #Don't get listing information if we are auto
+    if ($global:runMode -ne "auto") {
+        $shop.allListings = GetAllListings $shop.shop_id $shop.accessToken
+    }
 
     Write-host "`t[$($shop.openOrders.count)] open orders." -ForegroundColor Cyan
     Write-host "`t[$($shop.allListings.count)] active listings listings." -ForegroundColor Cyan
@@ -99,10 +134,22 @@ function AddShop() {
 Exports all shops inventories to a CSV file.
 #>
 function ExportAllShopInventory() {
-    foreach($shop in $global:allShops)
-    {
-        ExportShopListings $shop
+    foreach ($shop in $global:allShops) {
+        ExportShopInventory $shop
     }
+}
+
+<#
+Updates all shops inventories from the saved CSV files
+#>
+function UpdateAllShopInventory() {
+    foreach ($shop in $global:allShops) {
+        ImportShopInventories $shop
+    }
+}
+
+function ImportShopInventories($shop) {
+
 }
 
 <#
@@ -119,11 +166,9 @@ function RefreshAllShops() {
 <#
 Provided with a shop object, exports all listing inventories to a CSV file.
 #>
-function ExportShopListings($shop) {
+function ExportShopInventory($shop) {
     $list = [System.Collections.Generic.List[Object]]::new()
     foreach ($listing in $shop.allListings) {
-
-        write-host $listing.title
         $itemVariations = GetAllVariationsFromListing $listing
         $variationTitles = GetVariationTitlesFromList $itemVariations
             
@@ -138,8 +183,8 @@ function ExportShopListings($shop) {
 
         switch ($itemVariations[0].GetType().Name) {            
             "SingleOrNoPriceVariation" {
-                $primaryVariations = ($itemVariations | Where-Object {$_.property_name -eq $variationTitles[0]})
-                $secondaryVariations = ($itemVariations | Where-Object {$_.property_name -eq $variationTitles[1]})
+                $primaryVariations = ($itemVariations | Where-Object { $_.property_name -eq $variationTitles[0] })
+                $secondaryVariations = ($itemVariations | Where-Object { $_.property_name -eq $variationTitles[1] })
 
                 if ($variationTitles.count -gt 0) {
                     $struct.priVarName = $variationTitles[0]
@@ -147,8 +192,7 @@ function ExportShopListings($shop) {
                         $valueToAdd = $primaryVariations[$i].value
         
                         #Single price set variations are handled on primary variation ONLY
-                        if($null -ne $primaryVariations[$i].price -and $priceProps.count -eq 1)
-                        {
+                        if ($null -ne $primaryVariations[$i].price -and $priceProps.count -eq 1) {
                             $valueToAdd += ";$($primaryVariations[$i].price)"
                         }
         
@@ -167,16 +211,16 @@ function ExportShopListings($shop) {
             }
     
             "DoublePriceVariation" {
-                    $struct.priVarName = $variationTitles[0]
-                    $struct.secVarName = $variationTitles[1]
-                    $struct.priScale_id = $itemVariations[0].priScale_id
-                    $struct.secScale_id = $itemVariations[0].sec
-                    for ($i = 0; $i -lt $itemVariations.count; $i++) {
-                        $v = $itemVariations[$i]
-                        SetValueByString $struct "priVarValue$($i)" "$($v.value);$($v.price);$($v.value2)"
+                $struct.priVarName = $variationTitles[0]
+                $struct.secVarName = $variationTitles[1]
+                $struct.priScale_id = $itemVariations[0].priScale_id
+                $struct.secScale_id = $itemVariations[0].sec
+                for ($i = 0; $i -lt $itemVariations.count; $i++) {
+                    $v = $itemVariations[$i]
+                    SetValueByString $struct "priVarValue$($i)" "$($v.value);$($v.price);$($v.value2)"
                         
-                    }
                 }
+            }
             
         }
 
@@ -194,14 +238,14 @@ function SetValueByString($object, $key, $Value) {
 
 function GetNewInventoryExportStructure {
     $obj = [PSCustomObject]@{
-        actions = $null
-        listing_id   = $null
-        quantity = $null
-        title = $null
-        priScale_id     = $null
-        secScale_id     = $null
-        priVarName   = $null
-        secVarName   = $null
+        actions     = $null
+        listing_id  = $null
+        quantity    = $null
+        title       = $null
+        priScale_id = $null
+        secScale_id = $null
+        priVarName  = $null
+        secVarName  = $null
     } 
 
     $cusVarLimit = 30
