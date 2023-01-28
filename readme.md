@@ -3,7 +3,13 @@ This is a home brew solution to manage 1 or more Etsy shops with bulk actions.
 
 Why the name? By my own admission, this is *not* the best solution to Etsy shop management. I'm making this mostly because I wanted to learn PowerShell better and Etsy shop management was a problem I needed to solve.
 
-Currently this does not do much but connect to Etsy and make some Get requests to pull shop data. I'm currently working on actual bulk management features, but Etsy's V3 API is trash to work with so this is taking some time.
+## Current Use Cases
+- Exporting shop inventories to CSV file (Variations)
+
+## Planned Features
+- Automated quantity "pegging" to reset and items inventory every so often.
+- Automated posting open orders to Home Assistant.
+- Updating order inventories (Variations) in bulk
 
 How to get this running:
 
@@ -33,7 +39,7 @@ There are various configuration options inside `Lib\EtsyAPIGlobalVars.ps1`
  - `$global:saveLocation` is a `string` of a path for where all data should be stored.
 
  ## Etsy ID tables
- Puttings these here for quick reference later on. Etsy does not seem to have these documented.
+ Putting these here for quick reference later on. Etsy does not seem to have these documented.
 
 | property_id     | Value       |
 |-----------------|-------------|
