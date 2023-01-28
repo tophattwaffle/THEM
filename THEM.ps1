@@ -16,13 +16,7 @@ catch {
 }
 #endregion
 
-function ExportListings() {
-    foreach ($shop in $global:allShops) {
-
-    }
-}
-
-function UpdateVariations() {
+function UpdateAllShopInventory() {
 
 }
 

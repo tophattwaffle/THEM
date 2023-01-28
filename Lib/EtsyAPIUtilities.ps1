@@ -8,12 +8,6 @@ function NewStringList() {
     return New-Object 'System.Collections.Generic.List[string]]'
 }
 
-function SetValueByString($object, $key, $Value) {
-    $p1, $p2 = $key.Split(".")
-    if ($p2) { SetValue -object $object.$p1 -key $p2 -Value $Value }
-    else { $object.$p1 = $Value }
-}
-
 function SaveShopsToFile() {
     $destination = "$global:saveLocation\EtsyAPI.xml"
     write-host "Writing all shops to: $destination"
@@ -49,32 +43,32 @@ function GetAllVariationsFromListing($listing) {
 
     $pricingProperties = $listing.inventory.price_on_property
 
+    
     #Handle pricing on a single property!
     if ($pricingProperties.count -le 1) {
         foreach ($product in $listing.inventory.products) {
-            
             $list.Add([SingleOrNoPriceVariation]@{
                     property_name     = $product.property_values[0].property_name
                     value             = $product.property_values[0].values[0]
                     price             = $product.offerings[0].price.amount / $product.offerings[0].price.divisor
-                    scale_id          = $prop_values.scale_id
+                    scale_id          = $product.property_values[0].scale_id
                 })
 
             #There is a 2nd variation on listing
             if ($product.property_values.count -eq 2) {
-                $list.Add([SinglePriceVariation]@{
+                $list.Add([SingleOrNoPriceVariation]@{
                         property_name     = $product.property_values[1].property_name
                         value             = $product.property_values[1].values[0]
                         price             = $product.offerings[0].price.amount / $product.offerings[0].price.divisor
-                        scale_id          = $prop_values.scale_id
+                        scale_id          = $product.property_values[1].scale_id
                     })
             }
         }
 
         #If the price property does not match the property_name, null the price.
         foreach ($i in $list) {
-            $thisPropId = $global:property_id.Item($i.property_name)
-            if ($thisPropId -ne $i.price_on_property) {
+            $thisPropId = GetProperty_id $i.property_name
+            if ($thisPropId -ne $pricingProperties[0]) {
                 $i.price = $null
             }
         }
@@ -90,7 +84,8 @@ function GetAllVariationsFromListing($listing) {
                     property_name2    = $product.property_values[1].property_name
                     value2            = $product.property_values[1].values[0]
                     price             = $product.offerings[0].price.amount / $product.offerings[0].price.divisor
-                    scale_id          = $prop_values.scale_id
+                    priScale_id          = $product.property_values[0].scale_id
+                    secScale_id          = $product.property_values[1].scale_id
                 })
         }
     }
@@ -113,12 +108,6 @@ function GetAllVariationsFromListing($listing) {
     return $null
 }
 
-# class NoPriceVariation {
-#     [string]$property_name
-#     [string]$value
-#     [nullable[int]]$scale_id
-# }
-
 class SingleOrNoPriceVariation {
     [string]$property_name
     [string]$value
@@ -132,12 +121,15 @@ class DoublePriceVariation {
     [string]$property_name2
     [string]$value2
     [float]$price
-    [nullable[int]]$scale_id
+    [nullable[int]]$priScale_id
+    [nullable[int]]$secScale_id
 }
 
+<#
+Takes a product and a list and will return JSON formatted data ready for UpdateListingInventory.
+Use this to generate the required data to update after all things are in the local objects.
+#>
 function CreateUpdateListingInventoryFromList($product, $list) {
-
-
     switch ($list[0].GetType().Name) {
         "SingleOrNoPriceVariation" {
             $result = CreateJsonSingleOrNoPriceVariation $product $list
@@ -152,6 +144,12 @@ function CreateUpdateListingInventoryFromList($product, $list) {
     return $result
 }
 
+<#
+Provided with a product and a list with 2 variations with prices dependant on both variation properties.
+Returns an inventory schema that can be sent with UpdateListingInventory call
+
+Typically you'll want to use GetAllVariationsFromListing to get the varitions, then append your own to that before using this.
+#>
 function CreateJsonDoublePriceVariation($product, $list)
 {
     $inventorySchema = GetInventorySchema $product
@@ -163,12 +161,12 @@ function CreateJsonDoublePriceVariation($product, $list)
 
         $productSchema.sku = if ($null -eq $product.sku) { "" } else { $product.sku }
         $productSchema.property_values[0].property_id = (GetProperty_id $i.property_name)
-        $productSchema.property_values[0].scale_id = $i.scale_id
+        $productSchema.property_values[0].scale_id = $i.priScale_id
         $productSchema.property_values[0].property_name = $i.property_name
         $productSchema.property_values[0].values[0] = $i.value
 
         $productSchema.property_values[1].property_id = (GetProperty_id $i.property_name2)
-        $productSchema.property_values[1].scale_id = $null #TODO: fix? NO scale ID for 2nd variation. Must be primary prop. 
+        $productSchema.property_values[1].scale_id = $i.secScale_id
         $productSchema.property_values[1].property_name = $i.property_name2
         $productSchema.property_values[1].values[0] = $i.value2
 
@@ -176,22 +174,43 @@ function CreateJsonDoublePriceVariation($product, $list)
         $productSchema.offerings[0].quantity = $product.quantity
         $productSchema.offerings[0].is_enabled = $true
 
+        if($productSchema.property_values[0].property_id -eq $productSchema.property_values[2].property_id)
+        {
+            $productSchema.property_values[2].property_id = (GetProperty_id "CUSTOM2")
+        }
+
         $inventorySchema.products += $productSchema
     }
-    return $inventorySchema
-}
-
-function GetVariationTitlesFromList($list) {
-    #Determine the number of variations in the list.
-    $variationNames = [System.Collections.Generic.List[String]]::new()
-    foreach ($i in $list) {
-        $variationNames.Add($i.property_name)
-    }
-    return $variationNames | Select-Object -Unique
+    return Convertto-json $inventorySchema -Depth 10
 }
 
 <#
-Provided with a product and a list with no price variations
+Provided with a list of variations, returns a list with just the names of the variation types.
+#>
+function GetVariationTitlesFromList($list) {
+    #Determine the number of variations in the list.
+    $variationNames = [System.Collections.Generic.List[String]]::new()
+    switch ($list[0].GetType().Name) {
+        "SingleOrNoPriceVariation" {
+            foreach ($i in $list) {
+                $variationNames.Add($i.property_name)
+            }
+        }
+
+        #I don't think order matters for this one???
+        "DoublePriceVariation" {
+            $variationNames.Add($list[0].property_name)
+            $variationNames.Add($list[0].property_name2)
+        }
+    }
+
+    [array]$variationNames = $variationNames | Select-Object -Unique
+
+    return , $variationNames 
+}
+
+<#
+Provided with a product and a list with 1 or 2 variations and can support SINGLE variation pricing
 Returns an inventory schema that can be sent with UpdateListingInventory call
 #>
 function CreateJsonSingleOrNoPriceVariation($product, $list) {
@@ -246,7 +265,12 @@ function CreateJsonSingleOrNoPriceVariation($product, $list) {
             $inventorySchema.products[$i + $j].property_values[1].scale_id = $var2list[$j].scale_id
             $inventorySchema.products[$i + $j].property_values[1].property_name = $var2list[$j].property_name
             $inventorySchema.products[$i + $j].property_values[1].values[0] = $var2list[$j].value
+
+            if($inventorySchema.products[$i + $j].property_values[0].property_id -eq $inventorySchema.products[$i + $j].property_values[2].property_id)
+            {
+                $inventorySchema.products[$i + $j].property_values[1].property_id = (GetProperty_id "CUSTOM2")
+            }
         }
     }
-    return $inventorySchema
+    return Convertto-json $inventorySchema -Depth 10
 }

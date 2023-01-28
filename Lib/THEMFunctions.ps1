@@ -6,18 +6,18 @@ Main menu function.
 function MainMenu() {
     $RefreshAllShops = New-Object System.Management.Automation.Host.ChoiceDescription '&Refresh Shop Data', 'Asks for new shop data from Etsy'
     $AddShop = New-Object System.Management.Automation.Host.ChoiceDescription '&Add New Shop', 'Adds a new shop to be managed by this application'
-    $ExportListings = New-Object System.Management.Automation.Host.ChoiceDescription '&Export Listings', 'Exports listings to a CSV file'
-    $UpdateVariations = New-Object System.Management.Automation.Host.ChoiceDescription '&Update Variations', 'Updates variations based on CSV files previous exported'
+    $ExportAllShopInventory = New-Object System.Management.Automation.Host.ChoiceDescription '&Export Listing Inventory', 'Exports all listings inventories to CSV. Useful for managing variations.'
+    $UpdateAllShopInventory = New-Object System.Management.Automation.Host.ChoiceDescription '&Update Listing Inventory', 'Update all listings inventories based on the previously exported files.'
 
-    $options = [System.Management.Automation.Host.ChoiceDescription[]]($RefreshAllShops, $AddShop, $ExportListings, $UpdateVariations)
+    $options = [System.Management.Automation.Host.ChoiceDescription[]]($RefreshAllShops, $AddShop, $ExportAllShopInventory, $UpdateAllShopInventory)
     $title = 'What would you like to do?'
     $message = 'Please make a selection for what you would like to do...'
     $choice = $host.ui.PromptForChoice($title, $message, $options, 0)
     switch ($choice) {
         0 { RefreshAllShops }
         1 { AddShop }
-        2 { ExportListings }
-        3 { UpdateVariations }
+        2 { ExportAllShopInventory }
+        3 { UpdateAllShopInventory }
     }
 }
 
@@ -96,6 +96,16 @@ function AddShop() {
 }
 
 <#
+Exports all shops inventories to a CSV file.
+#>
+function ExportAllShopInventory() {
+    foreach($shop in $global:allShops)
+    {
+        ExportShopListings $shop
+    }
+}
+
+<#
 Asks Etsy for up to data shop data, then saves to file.
 #>
 function RefreshAllShops() {
@@ -104,4 +114,104 @@ function RefreshAllShops() {
     }
 
     SaveShopsToFile
+}
+
+<#
+Provided with a shop object, exports all listing inventories to a CSV file.
+#>
+function ExportShopListings($shop) {
+    $list = [System.Collections.Generic.List[Object]]::new()
+    foreach ($listing in $shop.allListings) {
+
+        write-host $listing.title
+        $itemVariations = GetAllVariationsFromListing $listing
+        $variationTitles = GetVariationTitlesFromList $itemVariations
+            
+        $struct = GetNewInventoryExportStructure
+
+        $struct.listing_id = $listing.listing_id
+        $struct.quantity = $listing.quantity
+        if ($listing.title.Length -ge 30) { $struct.listing_name = $listing.title.Substring(0, 30) }
+        else { $struct.title = $listing.title }
+
+        $priceProps = $listing.inventory.price_on_property
+
+        switch ($itemVariations[0].GetType().Name) {            
+            "SingleOrNoPriceVariation" {
+                $primaryVariations = ($itemVariations | Where-Object {$_.property_name -eq $variationTitles[0]})
+                $secondaryVariations = ($itemVariations | Where-Object {$_.property_name -eq $variationTitles[1]})
+
+                if ($variationTitles.count -gt 0) {
+                    $struct.priVarName = $variationTitles[0]
+                    for ($i = 0; $i -lt $primaryVariations.count; $i++) {
+                        $valueToAdd = $primaryVariations[$i].value
+        
+                        #Single price set variations are handled on primary variation ONLY
+                        if($null -ne $primaryVariations[$i].price -and $priceProps.count -eq 1)
+                        {
+                            $valueToAdd += ";$($primaryVariations[$i].price)"
+                        }
+        
+                        SetValueByString $struct "priVarValue$($i)" $valueToAdd
+                        $struct.priScale_id = $primaryVariations[$i].scale_id
+                    }
+                }
+        
+                if ($variationTitles.count -eq 2) {
+                    $struct.secVarName = $variationTitles[1]
+                    for ($i = 0; $i -lt $secondaryVariations.count; $i++) {
+                        SetValueByString $struct "secVarValue$($i)" $secondaryVariations[$i].value
+                        $struct.secScale_id = $secondaryVariations[$i].scale_id
+                    }
+                }
+            }
+    
+            "DoublePriceVariation" {
+                    $struct.priVarName = $variationTitles[0]
+                    $struct.secVarName = $variationTitles[1]
+                    $struct.priScale_id = $itemVariations[0].priScale_id
+                    $struct.secScale_id = $itemVariations[0].sec
+                    for ($i = 0; $i -lt $itemVariations.count; $i++) {
+                        $v = $itemVariations[$i]
+                        SetValueByString $struct "priVarValue$($i)" "$($v.value);$($v.price);$($v.value2)"
+                        
+                    }
+                }
+            
+        }
+
+        $list.Add($struct)
+    }
+
+    $list | Export-Csv -Path "$($global:saveLocation)\$($shop.shop_id)_inventory.csv" -NoTypeInformation
+}
+
+function SetValueByString($object, $key, $Value) {
+    $p1, $p2 = $key.Split(".")
+    if ($p2) { SetValue -object $object.$p1 -key $p2 -Value $Value }
+    else { $object.$p1 = $Value }
+}
+
+function GetNewInventoryExportStructure {
+    $obj = [PSCustomObject]@{
+        actions = $null
+        listing_id   = $null
+        quantity = $null
+        title = $null
+        priScale_id     = $null
+        secScale_id     = $null
+        priVarName   = $null
+        secVarName   = $null
+    } 
+
+    $cusVarLimit = 30
+    for ($i = 0; $i -lt $cusVarLimit; $i++) {
+        $obj | Add-Member -NotePropertyName "priVarValue$($i)" -NotePropertyValue $null
+    }
+
+    for ($i = 0; $i -lt $cusVarLimit; $i++) {
+        $obj | Add-Member -NotePropertyName "secVarValue$($i)" -NotePropertyValue $null
+    }
+
+    return $obj
 }

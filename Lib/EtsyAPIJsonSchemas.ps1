@@ -12,8 +12,15 @@ function GetProperty_id($string)
 {
   foreach($i in $global:property_id.Keys)
   {
-    if($i.contains($string)) {return $global:property_id.Item($i)}
+    if($i.contains($string)) {$returnVar = $global:property_id.Item($i)}
   }
+
+  if($null -eq $returnVar)
+  {
+    $returnVar = $global:property_id.Item("CUSTOM1")
+  }
+
+  return $returnVar
 }
 
 function GetInventorySchema($listing) {
