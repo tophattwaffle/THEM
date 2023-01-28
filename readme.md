@@ -5,10 +5,10 @@ Why the name? By my own admission, this is *not* the best solution to Etsy shop 
 
 ## Current Use Cases
 - Exporting shop inventories to CSV file (Variations)
+- Tracking open orders for all shops using Home Assistant
 
 ## Planned Features
 - Automated quantity "pegging" to reset and items inventory every so often.
-- Automated posting open orders to Home Assistant.
 - Updating order inventories (Variations) in bulk
 
 How to get this running:
@@ -52,3 +52,15 @@ There are various configuration options inside `Lib\EtsyAPIGlobalVars.ps1`
 | scale_id        | Value       |
 |-----------------|-------------|
 | Inches          | 327         |
+
+## Settings up Home Assistant Open Order Checking
+*Honestly there should probably be a Home Assistant based solution for this task, but I already wrote this in PowerShell and I have a windows server.*
+
+ 1. In Home Assistant create input_number helpers for each shop to track.
+ 2. In Node-Red (required), create a webhook and copy the URL.
+ 3. After the Webhook node, add a "switch" to check the property `msg.payload.shop_id`.
+ 4. Create an output on `==` for each shop_id you're going to update.
+ 5. Put a call service after the switch and set domain to `input_number` service to `set_value` and specify your helper entity. Use `{"value":payload.openOrders}` as the data.
+ 6. From the `THEM.ps1` main menu, select `Set HA Webhook URL` and paste the URL in.
+ 7. Refresh Shop Data and the webhook will be automatically called.
+ 8. *Optional* You can launch the script with the parameter `"auto"` to have it automatically run, update open orders and post to the webhook. For this to work, make sure the settings files are able to be loaded. (You may need to edit the settings locations from the `Documents` folder depending on the user launching it.) I'm using a Task Scheduler task to handle this.

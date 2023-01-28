@@ -47,7 +47,7 @@ function TestAPIKey($key) {
 
     $url = "$($global:baseUrl)openapi-ping"
 
-    $result = Invoke-WebRequest -Uri $url -Headers $header -Method 'GET' -MaximumRedirection 5 -ErrorAction SilentlyContinue
+    $result = Invoke-WebRequest -Uri $url -Headers $header -Method 'GET' -MaximumRedirection 5 -ErrorAction SilentlyContinue -UseBasicParsing
     if ($result.StatusCode -eq 200) {
         write-host "Connected to Etsy OpenAPI!" -ForegroundColor DarkGreen
     }
@@ -162,7 +162,7 @@ function RefreshOAuth($shop) {
 
     $refreshUrl = "https://api.etsy.com/v3/public/oauth/token"
 
-    $result = Invoke-WebRequest -Uri $refreshUrl -Headers $headers -Body $requestBody -Method 'POST' -MaximumRedirection 5
+    $result = Invoke-WebRequest -Uri $refreshUrl -Headers $headers -Body $requestBody -Method 'POST' -MaximumRedirection 5 -UseBasicParsing
     $json = ConvertFrom-Json $result.content
 
     $shop.accessToken = $json.access_token

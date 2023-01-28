@@ -1,3 +1,11 @@
+#Stop transcript if running, then start a new one. Transcript good for logging when running headless.
+try {
+    stop-transcript | out-null
+}
+catch [System.InvalidOperationException] {}
+Start-Transcript "$($env:TEMP)\THEM.txt"
+
+
 # region Include required files
 $global:runMode = $args[0]
 $ScriptDirectory = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
@@ -25,14 +33,13 @@ if ($global:runMode -ne "auto") {
 
 
 
-    
+
     while ($true) {
         MainMenu
     }
 }
 #Automate actions!
-elseif ($global:runMode -eq "auto")
-{
+elseif ($global:runMode -eq "auto") {
     Write-host "Auto mode!"
     RefreshAllShops #Refresh all shops so the webhooks can be published.
 }
