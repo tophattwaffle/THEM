@@ -203,8 +203,8 @@ function Init {
         RefreshOAuth $shop | Out-Null
         if (!$global:dontRefreshOnLoad) {
             UpdateShopFromEtsy $shop
-            SaveShopsToFile
         }
     }
     #Save shops after the initial refresh
+    SaveShopsToFile
 }
