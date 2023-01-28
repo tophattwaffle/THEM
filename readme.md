@@ -8,7 +8,7 @@ Why the name? By my own admission, this is *not* the best solution to Etsy shop 
 - Tracking open orders for all shops using Home Assistant
 
 ## Planned Features
-- Automated quantity "pegging" to reset and items inventory every so often.
+- Automated quantity "pegging" to reset an items inventory every so often.
 - Updating order inventories (Variations) in bulk
 
 How to get this running:
