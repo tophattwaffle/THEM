@@ -49,6 +49,7 @@ function GetAllVariationsFromListing($listing) {
                     value             = $product.property_values[0].values[0]
                     price             = $product.offerings[0].price.amount / $product.offerings[0].price.divisor
                     scale_id          = $product.property_values[0].scale_id
+                    quantity = $product.offerings[0].quantity
                 })
 
             #There is a 2nd variation on listing
@@ -83,6 +84,7 @@ function GetAllVariationsFromListing($listing) {
                     price             = $product.offerings[0].price.amount / $product.offerings[0].price.divisor
                     priScale_id          = $product.property_values[0].scale_id
                     secScale_id          = $product.property_values[1].scale_id
+                    quantity = $product.offerings[0].quantity
                 })
         }
     }
@@ -108,6 +110,7 @@ function GetAllVariationsFromListing($listing) {
 class SingleOrNoPriceVariation {
     [string]$property_name
     [string]$value
+    [int]$quantity
     [nullable[float]]$price
     [nullable[int]]$scale_id
 }
@@ -117,6 +120,7 @@ class DoublePriceVariation {
     [string]$value
     [string]$property_name2
     [string]$value2
+    [int]$quantity
     [float]$price
     [nullable[int]]$priScale_id
     [nullable[int]]$secScale_id
@@ -188,7 +192,7 @@ function CreateJsonDoublePriceVariation($product, $list)
         $productSchema.property_values[1].values[0] = $i.value2
 
         $productSchema.offerings[0].price = $i.price
-        $productSchema.offerings[0].quantity = $product.quantity
+        $productSchema.offerings[0].quantity = $i.quantity
         $productSchema.offerings[0].is_enabled = $true
 
         if($productSchema.property_values[0].property_id -eq $productSchema.property_values[1].property_id)
@@ -270,7 +274,7 @@ function CreateJsonSingleOrNoPriceVariation($product, $list) {
             $productSchema.offerings[0].price = $i.price
         }
 
-        $productSchema.offerings[0].quantity = $product.quantity
+        $productSchema.offerings[0].quantity = $i.quantity
         $productSchema.offerings[0].is_enabled = $true
 
         $inventorySchema.products += $productSchema

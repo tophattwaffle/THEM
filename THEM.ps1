@@ -3,7 +3,8 @@ try {
     stop-transcript | out-null
 }
 catch [System.InvalidOperationException] {}
-Start-Transcript "$($env:TEMP)\THEM.txt"
+$transPath = "$PSScriptroot\THEM.txt"
+Start-Transcript -Path $transPath
 
 
 # region Include required files

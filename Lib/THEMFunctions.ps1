@@ -208,6 +208,7 @@ function ImportShopInventories($shop) {
                         property_name2 = $i.secVarName
                         value2         = $splits[2]
                         price          = $splits[1] -as [double]
+                        quantity = $i.quantity
                         priScale_id    = if ($i.priScale_id) { $i.priScale_id } else { $null }
                         secScale_id    = if ($i.secScale_id) { $i.secScale_id } else { $null }
                     })
@@ -224,6 +225,7 @@ function ImportShopInventories($shop) {
                 }
 
                 $list.Add([SingleOrNoPriceVariation]@{
+                    quantity = $i.quantity
                         property_name = $i.priVarName
                         value         = $value
                         price         = $price
@@ -232,6 +234,7 @@ function ImportShopInventories($shop) {
             }
             foreach ($x in $invtoryList.secList) {
                 $list.Add([SingleOrNoPriceVariation]@{
+                    quantity = $i.quantity
                         property_name = $i.secVarName
                         value         = $x
                         price         = $null
