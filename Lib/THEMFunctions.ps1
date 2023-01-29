@@ -180,7 +180,10 @@ function ImportShopInventories($shop) {
 
     foreach ($i in $importedInventory) {
         #Skip listings that we don't want to do anything with.
-        if ("" -eq $i.actions) { continue }
+        if ("" -eq $i.actions) { 
+            write-host "Skipping $($i.title) becuase actions are blank!" -ForegroundColor Magenta
+            continue
+        }
 
         $list = [System.Collections.Generic.List[Object]]::new()
         $invtoryList = ReadCSVFormatVariationsIntoList $i
@@ -294,8 +297,7 @@ function ExportShopInventory($shop) {
         else { $struct.title = $listing.title }
 
         #No variations. Bail
-        if($null -eq $itemVariations)
-        {
+        if ($null -eq $itemVariations) {
             $list.Add($struct)
             continue
         }
