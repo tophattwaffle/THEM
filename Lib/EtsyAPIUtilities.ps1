@@ -36,6 +36,10 @@ function GetAllVariationsFromListing($listing) {
 
     $pricingProperties = $listing.inventory.price_on_property
 
+    if($pricingProperties.count -eq 0)
+    {
+        return $list
+    }
     
     #Handle pricing on a single property!
     if ($pricingProperties.count -le 1) {
@@ -201,6 +205,10 @@ function CreateJsonDoublePriceVariation($product, $list)
 Provided with a list of variations, returns a list with just the names of the variation types.
 #>
 function GetVariationTitlesFromList($list) {
+    if($null -eq $list)
+    {
+        return
+    }
     #Determine the number of variations in the list.
     $variationNames = [System.Collections.Generic.List[String]]::new()
     switch ($list[0].GetType().Name) {

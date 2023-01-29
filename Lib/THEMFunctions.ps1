@@ -293,6 +293,13 @@ function ExportShopInventory($shop) {
         if ($listing.title.Length -ge 30) { $struct.title = $listing.title.Substring(0, 30) }
         else { $struct.title = $listing.title }
 
+        #No variations. Bail
+        if($null -eq $itemVariations)
+        {
+            $list.Add($struct)
+            continue
+        }
+
         $priceProps = $listing.inventory.price_on_property
 
         switch ($itemVariations[0].GetType().Name) {            

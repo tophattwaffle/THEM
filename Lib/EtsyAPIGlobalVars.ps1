@@ -4,7 +4,7 @@ Write-Host "Loading GlobalVars..." -ForegroundColor Magenta
 These are variables that you can change to fit your needs.
 #>
 $global:dontRefreshOnLoad = $false
-$global:DraftsOnly = $false
+$global:DraftsOnly = $true
 $global:redirectURL = "https://www.tophattwaffle.com/auth.php"
 $global:saveLocation = "$([Environment]::GetFolderPath("MyDocuments"))\EtsyAPI"
 
