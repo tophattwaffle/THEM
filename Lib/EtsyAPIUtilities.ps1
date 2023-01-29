@@ -36,7 +36,7 @@ function GetAllVariationsFromListing($listing) {
 
     $pricingProperties = $listing.inventory.price_on_property
 
-    if($pricingProperties.count -eq 0)
+    if($listing.inventory.products[0].property_values.count -eq 0)
     {
         return $list
     }

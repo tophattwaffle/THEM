@@ -135,6 +135,7 @@ Exports all shops inventories to a CSV file.
 #>
 function ExportAllShopInventory() {
     foreach ($shop in $global:allShops) {
+        Write-host "Exporting $($shop.shop_name) to CSV!"
         ExportShopInventory $shop
     }
 }
@@ -349,8 +350,9 @@ function ExportShopInventory($shop) {
 
         $list.Add($struct)
     }
-
-    $list | Export-Csv -Path "$($global:saveLocation)\$($shop.shop_id)_inventory.csv" -NoTypeInformation
+    $dest = "$($global:saveLocation)\$($shop.shop_id)_inventory.csv"
+    $list | Export-Csv -Path $dest -NoTypeInformation
+    write-host "Exported to $dest"
 }
 
 function SetValueByString($object, $key, $Value) {
