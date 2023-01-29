@@ -50,6 +50,7 @@ There are various configuration options inside `Lib\EtsyAPIGlobalVars.ps1`
 | CUSTOM1         | 513         |
 | CUSTOM2         | 514         |
 | Size            | 100         |
+| Style           | 510			|
 
 | scale_id        | Value       |
 |-----------------|-------------|

@@ -1,22 +1,20 @@
 Write-Host "Loading EtsyAPIJsonSchemas..." -ForegroundColor Magenta
 
 $global:property_id = @{
-  "Primary color"  = 200
+  "Primary color"   = 200
   "Secondary color" = 52047899002
-  "CUSTOM1"        = 513
-  "CUSTOM2"        = 514
-  "Size"           = 100
+  "CUSTOM1"         = 513
+  "CUSTOM2"         = 514
+  "Size"            = 100
+  "Style"           = 510
 }
 
-function GetProperty_id($string)
-{
-  foreach($i in $global:property_id.Keys)
-  {
-    if($i.contains($string)) {$returnVar = $global:property_id.Item($i)}
+function GetProperty_id($string) {
+  foreach ($i in $global:property_id.Keys) {
+    if ($i.contains($string)) { $returnVar = $global:property_id.Item($i) }
   }
 
-  if($null -eq $returnVar)
-  {
+  if ($null -eq $returnVar) {
     $returnVar = $global:property_id.Item("CUSTOM1")
   }
 
@@ -70,6 +68,6 @@ function GetEmptyPropertyValuesSchema() {
   }
 '@
 
-$json = ConvertFrom-Json $schema
-return $json
+  $json = ConvertFrom-Json $schema
+  return $json
 }
