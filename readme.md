@@ -26,6 +26,11 @@ How to get this running:
 
 Data is stored in your `Documents/EtsyAPI directory`. At the moment *no stored data is encrypted*. If you want to "default" the script, delete the stored XML data.
 
+## Known Issues
+If you're using a `property_id` that isn't known to the script, it will have unexpected behavior. Typically I've seen this strip the pricing from variations that have prices associated with them. If this happens, you'll need to update the hash table inside `EtsyAPIJsonSchemas.ps1`
+
+I would have populated this with all known property_id's but it does not seem that Etsy publishes a full list.
+
 ## Additional Information
 There are various configuration options inside `Lib\EtsyAPIGlobalVars.ps1`
  - `$global:dontRefresh` is a `bool` variable that determines if shop data should be automatically refreshed on script load.
