@@ -4,12 +4,12 @@ This is a home brew solution to manage 1 or more Etsy shops with bulk actions.
 Why the name? By my own admission, this is *not* the best solution to Etsy shop management. I'm making this mostly because I wanted to learn PowerShell better and Etsy shop management was a problem I needed to solve.
 
 ## Current Use Cases
+- Make bulk edits to variations in Excel and push them to Etsy
 - Exporting shop inventories to CSV file (Variations)
 - Tracking open orders for all shops using Home Assistant
 
 ## Planned Features
 - Automated quantity "pegging" to reset and items inventory every so often.
-- Updating order inventories (Variations) in bulk
 
 How to get this running:
 
@@ -37,6 +37,8 @@ There are various configuration options inside `Lib\EtsyAPIGlobalVars.ps1`
  - `$global:redirectURL` is a `string` of your callback URL
 
  - `$global:saveLocation` is a `string` of a path for where all data should be stored.
+ 
+ - `$global:settings.splitChar` is a value that will be saved in `EtsyAPIsettings.xml`. This char is used to split variations during inventory exports / imports. This char cannot be used in your variation strings. It is default of `;`
 
  ## Etsy ID tables
  Putting these here for quick reference later on. Etsy does not seem to have these documented.
@@ -52,6 +54,32 @@ There are various configuration options inside `Lib\EtsyAPIGlobalVars.ps1`
 | scale_id        | Value       |
 |-----------------|-------------|
 | Inches          | 327         |
+
+## How to bulk update inventories
+
+1. Export your inventories to a CSV using the export function.
+2. Open the `[shop_id]_inventory.csv`
+3. Edit the inventories as needed. Be sure to follow the formatting as outlined below.
+4. In the `Actions` column, set the action to `update` for each inventory to be updated.
+5. From the main menu select update inventories.
+
+## Update Inventory Formatting
+
+Consider the following table:
+| listing_id | quantity | title            | priScale_id | secScale_id | priVarName    | secVarName        | priVarValue0        | priVarValue1          | priVarValue2 | ... | secVarValue0 | secVarValue1 | secVarValue2 |
+|------------|----------|------------------|-------------|-------------|---------------|-------------------|---------------------|-----------------------|--------------|-----|--------------|--------------|--------------|
+| 1234       | 15       | Single Variation |             |             | Primary color |                   | Red                 | Black                 | Magenta      | ... |              |              |              |
+| 9012       | 10       | Two Variations   |             |             | Primary Color | Secondary color   | Red                 | Black                 | Purple       | ... | Yellow       | Rose Gold    | Clear        |
+| 5678       | 5        | Price on Primary |             |             | Custom Name   | Another Custom    | Blue;7              | Mint;6                | Yellow;8     | ... | Rose gold    | Beige        |              |
+| 3456       | 6        | Price on Both    | 327         |             | Size          | Mounting Hardware | 6.5 x 4.5;8.49;None | 6.5 x 4.5;9.49;Screws |              | ... |              |              |              |
+
+listing_id `1234` only has primary variations. Each variation has no cost associated with it.
+
+listing_id `9012` has 2 variations. All combinations of these variations cost the same.
+
+listing_id `5678` has primary variations as well as secondary variations. However the price for each item is determined by the primary variation. You specify the price for each variation by placing the price after the variation name separated by a `;` which looks like `[NAME];[PRICE]`for example, to have a variation of `Blue` that costs `7.49` you would enter: `Blue;7.49`. The `;` is the value determined by `$global:settings.splitChar` which you can read more about above if you need to change it.
+
+listing_id `3456` has 2 variations with prices dependant on each variation. Editing these variations in this script is pretty dreadful, but it is supported. You won't use the `secVarValue#` columns for these, but everything is set in the `priVarValue#` column. This is done on purpose so you can easily see what you are doing. They are in the format of: `[PriVariation];[PRICE];[SecVariation]`. You **MUST MANUALLY** provide all possible combinations for variations that have price dependant on both variations. I personally find that listings like these are pretty uncommon (for my use case) so using the Etsy site for this is fine for me.
 
 ## Settings up Home Assistant Open Order Checking
 *Honestly there should probably be a Home Assistant based solution for this task, but I already wrote this in PowerShell and I have a windows server.*

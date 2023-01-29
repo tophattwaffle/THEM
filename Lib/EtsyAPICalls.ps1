@@ -33,5 +33,5 @@ Takes a listing ID and JSON formatted body of inventory to update for the provid
 function UpdateListingInventory ($listingId, $body, $accessToken) {
     $requestRequirements = GetEndpointRequirements "updateListingInventory" $accessToken $listingId
     $result = MakeEtsyRequest $requestRequirements $body
-    return $result.results
+    return $result
 }

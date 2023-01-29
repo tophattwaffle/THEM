@@ -144,12 +144,126 @@ Updates all shops inventories from the saved CSV files
 #>
 function UpdateAllShopInventory() {
     foreach ($shop in $global:allShops) {
-        ImportShopInventories $shop
+        $inventories = ImportShopInventories $shop
+
+        foreach ($inv in $inventories.Keys) {
+            $i = $inventories[$inv]
+            $product = $shop.allListings | Where-Object { $_.listing_id -eq $inv }#GET PROD 
+
+            $updateBody = CreateUpdateListingInventoryFromList $product $i
+
+            $result = UpdateListingInventory $product.listing_id $updateBody $shop.accessToken
+            if ($null -ne $result) {
+                write-host "Updated $($product.title) inventory!" -ForegroundColor Green
+            }
+            else {
+                write-host "Issue with $($product.title) inventory update!" -ForegroundColor Red
+            }
+        }
     }
 }
 
+<#
+Provided with a shop object, will read the CSV files and import them into a format that can be
+sent to the update endpoint.
+#>
 function ImportShopInventories($shop) {
+    $path = "$($global:saveLocation)\$($shop.shop_id)_inventory.csv"
+    if (!(Test-Path -Path $path)) {
+        Write-host "Cannot find $path" -ForegroundColor Red
+        Write-host "Did you export it yet?" -ForegroundColor Red
+        return
+    }
+    #Store each list of parsed object mapped to the listing_id
+    $dict = [System.Collections.Generic.Dictionary[[int64], [object]]]::new()
+    $importedInventory = Import-Csv $path
 
+    foreach ($i in $importedInventory) {
+        #Skip listings that we don't want to do anything with.
+        if ("" -eq $i.actions) { continue }
+
+        $list = [System.Collections.Generic.List[Object]]::new()
+        $invtoryList = ReadCSVFormatVariationsIntoList $i
+
+        #Determine if this object has prices dependant on both variations
+        $isDoublePriceVariation = $false
+        foreach ($j in $invtoryList.priList) {
+            $split = $j.split($global:settings.splitChar)
+            if ($split.count -eq 3) {
+                $isDoublePriceVariation = $true
+                break
+            }
+        }
+
+        if ($isDoublePriceVariation) {
+            foreach ($x in $invtoryList.priList) {
+                $splits = $x.split($global:settings.splitChar)
+                $list.Add([DoublePriceVariation]@{
+                        property_name  = $i.priVarName
+                        value          = $splits[0]
+                        property_name2 = $i.secVarName
+                        value2         = $splits[2]
+                        price          = $splits[1] -as [double]
+                        priScale_id    = if ($i.priScale_id) { $i.priScale_id } else { $null }
+                        secScale_id    = if ($i.secScale_id) { $i.secScale_id } else { $null }
+                    })
+            }
+        }
+        else {
+            foreach ($x in $invtoryList.priList) {
+                $price = $null
+                $value = $x
+                $xSplits = $x.split($global:settings.splitChar)
+                if ($xSplits.count -eq 2) {
+                    $value = $xSplits[0]
+                    $price = $xSplits[1] -as [double]
+                }
+
+                $list.Add([SingleOrNoPriceVariation]@{
+                        property_name = $i.priVarName
+                        value         = $value
+                        price         = $price
+                        scale_id      = if ($i.priScale_id) { $i.priScale_id } else { $null }
+                    })
+            }
+            foreach ($x in $invtoryList.secList) {
+                $list.Add([SingleOrNoPriceVariation]@{
+                        property_name = $i.secVarName
+                        value         = $x
+                        price         = $null
+                        scale_id      = if ($i.secScale_id) { $i.secScale_id } else { $null }
+                    })
+            }
+        }
+
+        $dict.Add($i.listing_id, $list)
+        
+    }
+    return $dict
+}
+
+<#
+Provided with a CSV imported inventory, returns a hashtable with 2 lists
+priList and secList with the primary variations and secondary variations as string lists.
+#>
+function ReadCSVFormatVariationsIntoList($csvInventory) {
+
+    $list = @{
+        priList = [System.Collections.Generic.List[String]]::new()
+        secList = [System.Collections.Generic.List[String]]::new()
+    }
+
+    for ($i = 0; $i -lt $global:settings.csvVariationLimit; $i++) {
+        $obj = GetValueByString $csvInventory "priVarValue$($i)"
+        if ($obj) { $list.priList.add($obj) }
+    }
+
+    for ($i = 0; $i -lt $global:settings.csvVariationLimit; $i++) {
+        $obj = GetValueByString $csvInventory "secVarValue$($i)"
+        if ($obj) { $list.secList.add($obj) }
+    }
+
+    return $list
 }
 
 <#
@@ -176,7 +290,7 @@ function ExportShopInventory($shop) {
 
         $struct.listing_id = $listing.listing_id
         $struct.quantity = $listing.quantity
-        if ($listing.title.Length -ge 30) { $struct.listing_name = $listing.title.Substring(0, 30) }
+        if ($listing.title.Length -ge 30) { $struct.title = $listing.title.Substring(0, 30) }
         else { $struct.title = $listing.title }
 
         $priceProps = $listing.inventory.price_on_property
@@ -193,7 +307,7 @@ function ExportShopInventory($shop) {
         
                         #Single price set variations are handled on primary variation ONLY
                         if ($null -ne $primaryVariations[$i].price -and $priceProps.count -eq 1) {
-                            $valueToAdd += ";$($primaryVariations[$i].price)"
+                            $valueToAdd += "$($global:settings.splitChar)$($primaryVariations[$i].price)"
                         }
         
                         SetValueByString $struct "priVarValue$($i)" $valueToAdd
@@ -217,7 +331,7 @@ function ExportShopInventory($shop) {
                 $struct.secScale_id = $itemVariations[0].sec
                 for ($i = 0; $i -lt $itemVariations.count; $i++) {
                     $v = $itemVariations[$i]
-                    SetValueByString $struct "priVarValue$($i)" "$($v.value);$($v.price);$($v.value2)"
+                    SetValueByString $struct "priVarValue$($i)" "$($v.value)$($global:settings.splitChar)$($v.price)$($global:settings.splitChar)$($v.value2)"
                         
                 }
             }
@@ -232,8 +346,14 @@ function ExportShopInventory($shop) {
 
 function SetValueByString($object, $key, $Value) {
     $p1, $p2 = $key.Split(".")
-    if ($p2) { SetValue -object $object.$p1 -key $p2 -Value $Value }
+    if ($p2) { SetValueByString -object $object.$p1 -key $p2 -Value $Value }
     else { $object.$p1 = $Value }
+}
+
+function GetValueByString($object, $key) {
+    $p1, $p2 = $key.Split(".")
+    if ($p2) { return GetValueByString -object $object.$p1 -key $p2 }
+    else { return $object.$p1 }
 }
 
 function GetNewInventoryExportStructure {
@@ -248,12 +368,11 @@ function GetNewInventoryExportStructure {
         secVarName  = $null
     } 
 
-    $cusVarLimit = 30
-    for ($i = 0; $i -lt $cusVarLimit; $i++) {
+    for ($i = 0; $i -lt $global:settings.csvVariationLimit; $i++) {
         $obj | Add-Member -NotePropertyName "priVarValue$($i)" -NotePropertyValue $null
     }
 
-    for ($i = 0; $i -lt $cusVarLimit; $i++) {
+    for ($i = 0; $i -lt $global:settings.csvVariationLimit; $i++) {
         $obj | Add-Member -NotePropertyName "secVarValue$($i)" -NotePropertyValue $null
     }
 

@@ -29,13 +29,6 @@ function LoadShopsFromFile() {
 }
 
 <#
-Determines how many TYPES (Eg. Primary Color + Seconday Color vs Primary Color) variations a listing
-#>
-function GetAmountOfVariationTypes($listing) {
-    return $listing.inventory.products[0].property_values.count
-}
-
-<#
 Gets all variations from a listing and parses them into a sorted list.
 #>
 function GetAllVariationsFromListing($listing) {
@@ -133,13 +126,33 @@ function CreateUpdateListingInventoryFromList($product, $list) {
     switch ($list[0].GetType().Name) {
         "SingleOrNoPriceVariation" {
             $result = CreateJsonSingleOrNoPriceVariation $product $list
+
+            #Make sure price on prop is set correctly by first checking if we have unique pricing.
+            $list = [System.Collections.Generic.List[float]]::new()
+            foreach($p in $result.products)
+            {
+                #add all prices to list
+                $list.add($p.offerings[0].price)
+            }
+            #De-dupe the list
+            $list = $list | Group-Object | ForEach-Object { $_.Group[0] }
+            #If the list has more than 1 item, we have unique pricing and need to set the prop.
+            if($list.Count -gt 1)
+            {
+                $result.price_on_property = @($result.products[0].property_values[0].property_id)
+            }
         }
 
         #I don't think order matters for this one???
         "DoublePriceVariation" {
             $result = CreateJsonDoublePriceVariation $product $list
+            
+            #Set the price on properties to be each prop value.
+            $result.price_on_property = @($result.products[0].property_values[0].property_id, $result.products[0].property_values[1].property_id)
         }
     }
+
+    $result = ConvertTo-Json $result -Depth 99
 
     return $result
 }
@@ -174,14 +187,14 @@ function CreateJsonDoublePriceVariation($product, $list)
         $productSchema.offerings[0].quantity = $product.quantity
         $productSchema.offerings[0].is_enabled = $true
 
-        if($productSchema.property_values[0].property_id -eq $productSchema.property_values[2].property_id)
+        if($productSchema.property_values[0].property_id -eq $productSchema.property_values[1].property_id)
         {
-            $productSchema.property_values[2].property_id = (GetProperty_id "CUSTOM2")
+            $productSchema.property_values[1].property_id = (GetProperty_id "CUSTOM2")
         }
 
         $inventorySchema.products += $productSchema
     }
-    return Convertto-json $inventorySchema -Depth 10
+    return $inventorySchema
 }
 
 <#
@@ -266,11 +279,11 @@ function CreateJsonSingleOrNoPriceVariation($product, $list) {
             $inventorySchema.products[$i + $j].property_values[1].property_name = $var2list[$j].property_name
             $inventorySchema.products[$i + $j].property_values[1].values[0] = $var2list[$j].value
 
-            if($inventorySchema.products[$i + $j].property_values[0].property_id -eq $inventorySchema.products[$i + $j].property_values[2].property_id)
+            if($inventorySchema.products[$i + $j].property_values[0].property_id -eq $inventorySchema.products[$i + $j].property_values[1].property_id)
             {
                 $inventorySchema.products[$i + $j].property_values[1].property_id = (GetProperty_id "CUSTOM2")
             }
         }
     }
-    return Convertto-json $inventorySchema -Depth 10
+    return $inventorySchema
 }

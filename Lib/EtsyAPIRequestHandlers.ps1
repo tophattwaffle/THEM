@@ -11,6 +11,7 @@ $global:property_id = @{
 
 $global:endpoints = @{}
 $global:baseUrl = "https://openapi.etsy.com/v3/application/"
+$reqHistory = [System.Collections.Generic.List[int]]::new()
 
 function SetupEndpoints() {
     $global:endpoints.Add("getListingsByShop", (CreateEndpointRequirement "shops/{shop_id}/listings?limit=100&includes=inventory" $true $true 'GET' $null))
@@ -25,6 +26,19 @@ Returns a dictionary containing all the needed headers to make an OAuth request.
 #>
 function MakeEtsyRequest($requirements, $payload = $null)
 {
+    $currentTime = [int](Get-Date -UFormat %s -Millisecond 0)
+
+    $PastRequests = $reqHistory | Where-Object {$_ -eq $currentTime}
+    #If we have too many past requests, delay for a second and then reset the list.
+    if($PastRequests.count -gt 2)
+    {
+        Write-Host "Rate limiting!" -ForegroundColor Black
+        $reqHistory = [System.Collections.Generic.List[int]]::new()
+        Start-Sleep -Seconds 1
+    }
+    $reqTime = [int](Get-Date -UFormat %s -Millisecond 0)
+    $reqHistory.Add($reqTime)
+
     if ($null -eq $payload) {
         return Invoke-RestMethod -Uri $requirements.url -Headers $requirements.headers -Method $requirements.requestType -MaximumRedirection 5
     }

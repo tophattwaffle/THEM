@@ -3,8 +3,8 @@ Write-Host "Loading GlobalVars..." -ForegroundColor Magenta
 <#
 These are variables that you can change to fit your needs.
 #>
-$global:dontRefreshOnLoad = $true
-$global:DraftsOnly = $true
+$global:dontRefreshOnLoad = $false
+$global:DraftsOnly = $false
 $global:redirectURL = "https://www.tophattwaffle.com/auth.php"
 $global:saveLocation = "$([Environment]::GetFolderPath("MyDocuments"))\EtsyAPI"
 
@@ -31,4 +31,6 @@ $global:allShops = New-Object Collections.Generic.List[Object]
 $global:settings = @{
     apiKey = $null
     webhookUrl = $null
+    splitChar = ';'
+    csvVariationLimit = 30
 }

@@ -30,10 +30,6 @@ Init
 #Main loop for interactive program.
 if ($global:runMode -ne "auto") {
 
-
-
-
-
     while ($true) {
         MainMenu
     }
