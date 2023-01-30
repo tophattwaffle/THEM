@@ -56,6 +56,8 @@ function UpdateShopFromEtsy($shop) {
             openOrders = $shop.openOrders.count
         }
 
+        if($null -eq $body.openOrders) {$body.openOrders = 0}
+
         Invoke-RestMethod -Uri $global:settings.webhookUrl -Method 'POST' -Body (ConvertTo-Json $body)
     }
 
