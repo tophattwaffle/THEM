@@ -33,4 +33,5 @@ $global:settings = @{
     webhookUrl = $null
     splitChar = ';'
     csvVariationLimit = 30
+    shopImageAltText = "Shop Informational Image"
 }

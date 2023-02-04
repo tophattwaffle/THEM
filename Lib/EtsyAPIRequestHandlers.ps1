@@ -19,6 +19,9 @@ function SetupEndpoints() {
     $global:endpoints.Add("getShopReceipts", (CreateEndpointRequirement "shops/{shop_id}/receipts?limit=100&was_paid=true&was_shipped=false" $true $true 'GET' $null))
     $global:endpoints.Add("updateListingInventory", (CreateEndpointRequirement "listings/{listing_id}/inventory" $true $true 'PUT' "application/json"))
     $global:endpoints.Add("getShopByOwnerUserId", (CreateEndpointRequirement "users/{user_id}/shops" $true $true 'GET' $null))
+    $global:endpoints.Add("getListingImages", (CreateEndpointRequirement "listings/{listing_id}/images" $true $false 'GET' $null))
+    $global:endpoints.Add("uploadListingImage", (CreateEndpointRequirement "shops/{shop_id}/listings/{listing_id}/images" $true $true 'POST' "multipart/form-data"))
+    $global:endpoints.Add("deleteListingImage", (CreateEndpointRequirement "shops/{shop_id}/listings/{listing_id}/images/{listing_image_id}" $true $true 'DELETE' $null))
 }
 
 <#
@@ -65,7 +68,7 @@ function GetEndpointRequirements($endpoint, $authToken, $replace = $null) {
         $dict.add("Authorization", "Bearer $authToken")
     }
 
-    if ($requirements.contentType -ne $null) {
+    if ($null -ne $requirements.contentType) {
         $dict.add("Content-Type", $requirements.contentType)
     }
 
@@ -82,7 +85,7 @@ function GetEndpointRequirements($endpoint, $authToken, $replace = $null) {
     }
     else {
         for ($i = 0; $i -lt $match.Count; $i++) {
-            $endpoint.url.Replace($match[$i].value, $replace[$i])
+            $endpoint.url = $endpoint.url.Replace($match[$i].value, $replace[$i])
         }
     }
 

@@ -23,9 +23,10 @@ function MainMenu() {
     $AddShop = New-Object System.Management.Automation.Host.ChoiceDescription '&Add New Shop', 'Adds a new shop to be managed by this application'
     $ExportShopInventory = New-Object System.Management.Automation.Host.ChoiceDescription '&Export Listing Inventory', 'Exports all listings inventories to CSV. Useful for managing variations.'
     $UpdateAllShopInventory = New-Object System.Management.Automation.Host.ChoiceDescription '&Update Listing Inventory', 'Update all listings inventories based on the previously exported files.'
+    $UpdateListingImages = New-Object System.Management.Automation.Host.ChoiceDescription '&Update Listing Images', 'Update all listings Images based on the previously exported files.'
     $AddWebhookURL = New-Object System.Management.Automation.Host.ChoiceDescription '&Set HA Webhook URL', 'Set the webhook URL to be used with Home Assistant'
 
-    $options = [System.Management.Automation.Host.ChoiceDescription[]]($RefreshAllShops, $AddShop, $ExportShopInventory, $UpdateAllShopInventory, $AddWebhookURL)
+    $options = [System.Management.Automation.Host.ChoiceDescription[]]($RefreshAllShops, $AddShop, $ExportShopInventory, $UpdateAllShopInventory, $UpdateListingImages, $AddWebhookURL)
     $title = 'What would you like to do?'
     $message = 'Please make a selection for what you would like to do...'
     $choice = $host.ui.PromptForChoice($title, $message, $options, 0)
@@ -34,8 +35,112 @@ function MainMenu() {
         1 { AddShop }
         2 { ExportAllShopInventory }
         3 { UpdateAllShopInventory }
-        4 { SetWebhookURL }
+        4 { UpdateListingImages }
+        5 { SetWebhookURL }
     }
+}
+
+function UpdateListingImages() {
+    foreach ($shop in $global:allShops) {
+        $dest = "$($global:saveLocation)\$($shop.shop_id)_shopImages.csv"
+
+        if (!(Test-Path -Path $dest)) {
+            Write-host "Cannot find $dest"
+            continue
+        }
+
+        $csv = Import-Csv $dest
+
+        foreach ($listing in $csv) {
+            $images = $listing.imageTitles.split($global:settings.splitChar)
+            if (0 -eq $images[0].length -or $null -eq $images) {
+                Write-host "No images for $($listing.listing_id)"
+                continue
+            }
+
+            $existingImages = GetAllListingImages $listing.listing_id
+            
+            #How many show information images do we have currently?
+            $shopInfoImages = $existingImages | Where-Object {$_.alt_text -eq $($global:settings.shopImageAltText)}
+
+            #We have more images to upload than we currently have. Let's just scrub the current images uploaded.
+            if(($shopInfoImages.Count -gt 0 -or $null -ne $shopInfoImages) -and $shopInfoImages.Count -ne $images.Count)
+            {
+                foreach($img in $shopInfoImages)
+                {
+                    $rank = $img.rank
+                    DeleteListingImage $shop.accessToken $shop.shop_id $($img.listing_id) $($img.listing_image_id)
+                }
+                
+                #Refresh this data after the deletion
+                $existingImages = GetAllListingImages $listing.listing_id
+                $shopInfoImages = $existingImages | Where-Object {$_.alt_text -eq $($global:settings.shopImageAltText)}
+            }
+
+            #Have 10 images, just write them in from 10 backwards.
+            if ($existingImages.count -eq 10) {
+
+                #since we write in backwards, reverse the array. This does not return, but modifies the provded array
+                [array]::Reverse($images)
+
+                for ($i = 0; $i -lt $images.Count; $i++) {
+                    $imagePath = "$($global:saveLocation)\images\$($images[$i])"
+                    $rank = (10 - $i)
+                    
+                    $oldImage = $existingImages[$rank - 1]
+
+                    if ($null -ne $oldImage) {
+                        DeleteListingImage $shop.accessToken $shop.shop_id $($oldImage.listing_id) $($oldImage.listing_image_id)
+                    }
+                    
+                    write-host "Uploading $imagePath to $($listing.title) with rank $rank"
+                    $result = UploadListingImage $shop.accessToken $shop.shop_id $listing.listing_id $imagePath $rank $global:settings.shopImageAltText
+                }
+            }
+            #We already have the same number of images as we are going to upload, just punch for punch replace em.
+            elseif($shopInfoImages.Count -eq $images.Count)
+            {
+                for ($i = 0; $i -lt $images.Count; $i++) {
+                    $imagePath = "$($global:saveLocation)\images\$($images[$i])"
+
+                    $rank = $shopInfoImages[$i].rank
+                    DeleteListingImage $shop.accessToken $shop.shop_id $($shopInfoImages[$i].listing_id) $($shopInfoImages[$i].listing_image_id)
+                    write-host "Uploading $imagePath to $($listing.title) with rank $rank"
+                    $result = UploadListingImage $shop.accessToken $shop.shop_id $listing.listing_id $imagePath $rank $global:settings.shopImageAltText
+                }
+            }   
+            #No images currently exist. Upload them.
+            elseif($shopInfoImages.Count -eq 0){
+                $rank = $existingImages.Count
+
+                $projectedImages = $existingImages.Count + $images.Count
+                #Don't have enough room for all images, make some.
+                if($projectedImages -gt 10)
+                {
+                    $deleteFrom = $existingImages.Count - ($projectedImages - 10)
+                    for($i = $deleteFrom; $i -lt $existingImages.Count; $i++)
+                    {
+                        DeleteListingImage $shop.accessToken $shop.shop_id $($existingImages[$i].listing_id) $($existingImages[$i].listing_image_id)
+                    }
+                    $rank = $deleteFrom + 1
+                }
+                else {
+                    #Just increment rank count once
+                    $rank++
+                }
+
+                #Actually upload
+                
+                for ($i = 0; $i -lt $images.Count; $i++) {
+                    $imagePath = "$($global:saveLocation)\images\$($images[$i])"
+                    $usedRank = $i + $rank
+                    write-host "Uploading $imagePath to $($listing.title) with rank $usedRank"
+                    $result = UploadListingImage $shop.accessToken $shop.shop_id $listing.listing_id $imagePath $usedRank $global:settings.shopImageAltText                    
+                }
+            }
+        }
+    }
+    write-host "end of UpdateListingImages"
 }
 
 function SetWebhookURL() {
@@ -48,7 +153,7 @@ Updates all loaded shops from Etsy.
 #>
 function UpdateShopFromEtsy($shop) {
     Write-host "Getting shop information for $($shop.shop_name)..." -ForegroundColor Cyan
-    $shop.openOrders = GetAllOpenOrders $shop.shop_id $shop.accessToken
+    $shop.openOrders = GetAllOpenOrders $shop.accessToken $shop.shop_id
 
     if ($null -ne $global:settings.webhookUrl) {
         $body = @{
@@ -56,15 +161,15 @@ function UpdateShopFromEtsy($shop) {
             openOrders = $shop.openOrders.count
         }
 
-        if($null -eq $shop.openOrders) {$body.openOrders = 0}
-        elseif($null -eq $shop.openOrders.count) {$body.openOrders = 1}
+        if ($null -eq $shop.openOrders) { $body.openOrders = 0 }
+        elseif ($null -eq $shop.openOrders.count) { $body.openOrders = 1 }
 
         Invoke-RestMethod -Uri $global:settings.webhookUrl -Method 'POST' -Body (ConvertTo-Json $body)
     }
 
     #Don't get listing information if we are auto
     if ($global:runMode -ne "auto") {
-        $shop.allListings = GetAllListings $shop.shop_id $shop.accessToken
+        $shop.allListings = GetAllListings $shop.accessToken $shop.shop_id
     }
 
     Write-host "`t[$($shop.openOrders.count)] open orders." -ForegroundColor Cyan
@@ -156,7 +261,7 @@ function UpdateAllShopInventory() {
 
             $updateBody = CreateUpdateListingInventoryFromList $product $i
 
-            $result = UpdateListingInventory $product.listing_id $updateBody $shop.accessToken
+            $result = UpdateListingInventory $shop.accessToken $product.listing_id $updateBody
             if ($null -ne $result) {
                 write-host "Updated $($product.title) inventory!" -ForegroundColor Green
             }
@@ -211,7 +316,7 @@ function ImportShopInventories($shop) {
                         property_name2 = $i.secVarName
                         value2         = $splits[2]
                         price          = $splits[1] -as [double]
-                        quantity = $i.quantity
+                        quantity       = $i.quantity
                         priScale_id    = if ($i.priScale_id) { $i.priScale_id } else { $null }
                         secScale_id    = if ($i.secScale_id) { $i.secScale_id } else { $null }
                     })
@@ -228,7 +333,7 @@ function ImportShopInventories($shop) {
                 }
 
                 $list.Add([SingleOrNoPriceVariation]@{
-                    quantity = $i.quantity
+                        quantity      = $i.quantity
                         property_name = $i.priVarName
                         value         = $value
                         price         = $price
@@ -237,7 +342,7 @@ function ImportShopInventories($shop) {
             }
             foreach ($x in $invtoryList.secList) {
                 $list.Add([SingleOrNoPriceVariation]@{
-                    quantity = $i.quantity
+                        quantity      = $i.quantity
                         property_name = $i.secVarName
                         value         = $x
                         price         = $null
@@ -359,6 +464,50 @@ function ExportShopInventory($shop) {
     $dest = "$($global:saveLocation)\$($shop.shop_id)_inventory.csv"
     $list | Export-Csv -Path $dest -NoTypeInformation
     write-host "Exported to $dest"
+
+    createShopImagesCSV $shop
+}
+
+<#
+Provided with a shop, creates / updates the ShopImages csv file so you can assign images to a listing.
+#>
+function createShopImagesCSV($shop) {
+    $dest = "$($global:saveLocation)\$($shop.shop_id)_shopImages.csv"
+    $list = [System.Collections.Generic.List[Object]]::new()
+
+    #Read the existing listings into the file.
+    if ((Test-Path -Path $dest)) {
+        $import = Import-Csv $dest
+
+        foreach ($i in $import) {
+            $list.Add($i)
+        }
+    }
+
+    foreach ($listing in $shop.allListings) {
+        #Skip existing listings
+        $exists = $false
+        foreach ($i in $list) {
+            if ($i.listing_id -eq $listing.listing_id.ToString()) {
+                $exists = $true
+                break
+            }
+        }
+        if ($exists) { continue }
+            
+        $obj = [PSCustomObject]@{
+            listing_id  = $null
+            title       = $null
+            imageTitles = $null
+        } 
+
+        $obj.listing_id = $listing.listing_id
+        if ($listing.title.Length -ge 30) { $obj.title = $listing.title.Substring(0, 30) }
+        else { $obj.title = $listing.title }
+
+        $list.Add($obj)
+    }
+    $list | Export-Csv -Path $dest -NoTypeInformation
 }
 
 function SetValueByString($object, $key, $Value) {
@@ -394,4 +543,8 @@ function GetNewInventoryExportStructure {
     }
 
     return $obj
+}
+
+function GetAllShopImagesFromFolder($shop_id) {
+    return Get-ChildItem -Path "$global:saveLocation\Images" | Where-Object { $_.Name.contains("$shop_id") }
 }
