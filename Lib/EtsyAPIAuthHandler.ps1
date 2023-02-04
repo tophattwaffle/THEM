@@ -117,7 +117,7 @@ function GetConnectURL() {
     $BaseURL = "https://www.etsy.com/oauth/connect?response_type=code$(
     )&redirect_uri=$redirectURL$(
     )&scope=$formattedScopes$(
-    )&client_id=$apiKey$(
+    )&client_id=$($global:settings.apiKey)$(
     )&state=$global:state$(
     )&code_challenge=$global:codeChallenge$(
     )&code_challenge_method=S256"
