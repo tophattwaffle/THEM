@@ -38,5 +38,7 @@ if ($global:runMode -ne "auto") {
 #Automate actions!
 elseif ($global:runMode -eq "auto") {
     Write-host "Auto mode!"
-    RefreshAllShops #Refresh all shops so the webhooks can be published.
+    if ($global:dontRefreshOnLoad) {
+        RefreshAllShops #Refresh all shops so the webhooks can be published.
+    }
 }
