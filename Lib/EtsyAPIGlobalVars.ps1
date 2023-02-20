@@ -16,7 +16,10 @@ $global:scopes = @(
     "listings_r",
     "listings_w",
     "shops_r",
-    "shops_w"
+    "shops_w",
+    "billing_r",
+    "transactions_r",
+    "profile_r"
 )
 
 <#
