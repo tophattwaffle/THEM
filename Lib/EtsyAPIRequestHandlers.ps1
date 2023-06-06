@@ -16,7 +16,7 @@ $reqHistory = [System.Collections.Generic.List[int]]::new()
 function SetupEndpoints() {
     $global:endpoints.Add("getListingsByShop", (CreateEndpointRequirement "shops/{shop_id}/listings?limit=100&includes=inventory" $true $true 'GET' $null))
     $global:endpoints.Add("getListingsByShop_draftOnly", (CreateEndpointRequirement "shops/{shop_id}/listings?limit=100&includes=inventory&state=draft" $true $true 'GET' $null))
-    $global:endpoints.Add("getShopReceipts", (CreateEndpointRequirement "shops/{shop_id}/receipts?limit=100&was_paid=true&was_shipped=false" $true $true 'GET' $null))
+    $global:endpoints.Add("getShopReceipts", (CreateEndpointRequirement "shops/{shop_id}/receipts?limit=100&was_paid=true&was_shipped=false&was_canceled=false" $true $true 'GET' $null))
     $global:endpoints.Add("updateListingInventory", (CreateEndpointRequirement "listings/{listing_id}/inventory" $true $true 'PUT' "application/json"))
     $global:endpoints.Add("getShopByOwnerUserId", (CreateEndpointRequirement "users/{user_id}/shops" $true $true 'GET' $null))
     $global:endpoints.Add("getListingImages", (CreateEndpointRequirement "listings/{listing_id}/images" $true $false 'GET' $null))
